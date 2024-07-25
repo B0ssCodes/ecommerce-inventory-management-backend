@@ -46,5 +46,28 @@ namespace Inventory_Management_Backend.Controllers
 
         }
 
+        [HttpPost]
+        [Route("login")]
+        public async Task<IActionResult> Login(LoginRequestDTO loginDTO)
+        {
+            try
+            {
+                LoginResponseDTO loginResponse = await _authRepository.Login(loginDTO);
+                _apiResponse.StatusCode = HttpStatusCode.OK;
+                _apiResponse.IsSuccess = true;
+                _apiResponse.Message = "User logged in successfully";
+                _apiResponse.Result = loginResponse;
+                return Ok(_apiResponse);
+            }
+            catch (Exception ex)
+            {
+                _apiResponse.StatusCode = HttpStatusCode.BadRequest;
+                _apiResponse.IsSuccess = false;
+                _apiResponse.Message = ex.Message;
+                _apiResponse.Result = null;
+                return BadRequest(_apiResponse);
+            }
+        }
+
     }
 }
