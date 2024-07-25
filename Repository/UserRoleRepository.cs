@@ -67,14 +67,42 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public Task<List<UserRoleDTO>> GetUserRoles()
+        public async Task<List<UserRoleDTO>> GetUserRoles()
         {
-            throw new NotImplementedException();
+            using (var connection = _db.CreateConnection())
+            {
+                var query = @"
+            SELECT user_role_id_pkey AS UserRoleID, role AS Role
+            FROM user_role";
+
+                IEnumerable<UserRoleDTO> userRoles = await connection.QueryAsync<UserRoleDTO>(query);
+                if (userRoles == null)
+                {
+                    throw new Exception("No user roles found");
+                }
+                return userRoles.ToList();
+            }
         }
 
-        public Task<UserRoleDTO> UpdateUserRole(int roleId, string roleName)
+        public async Task<UserRoleDTO> UpdateUserRole(int roleId, string roleName)
         {
-            throw new NotImplementedException();
+            using (var connection = _db.CreateConnection())
+            {
+                var query = @"
+                    UPDATE user_role
+                    SET role = @RoleName
+                    WHERE user_role_id_pkey = @Id
+                    RETURNING user_role_id_pkey as UserRoleID, role AS Role";
+
+                var parameters = new { RoleName = roleName, Id = roleId };
+                UserRoleDTO updatedUserRole = await connection.QueryFirstOrDefaultAsync<UserRoleDTO>(query, parameters);
+
+                if (updatedUserRole == null)
+                {
+                    throw new Exception("Failed to update user role");
+                }
+                return updatedUserRole;
+            }
         }
     }
 }

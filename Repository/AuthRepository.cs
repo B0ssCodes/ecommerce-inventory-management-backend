@@ -19,17 +19,16 @@ namespace Inventory_Management_Backend.Repository
         {
             using (var connection = _db.CreateConnection())
             {
-                // Check if the user already exists
-                int? existingUserId = await connection.QueryFirstOrDefaultAsync<int?>(
-                    "SELECT user_id FROM user WHERE user_email = @Email",
+                // Check if the user already exists by email
+                bool emailExists = await connection.QueryFirstOrDefaultAsync<bool>(
+                    "SELECT EXISTS(SELECT 1 FROM public.\"user\" WHERE user_email = @Email)",
                     new { Email = registerDTO.Email });
 
-                if (existingUserId.HasValue)
+                if (emailExists)
                 {
                     throw new Exception("User already exists");
                 }
 
-                // Create a new user object
                 User newUser = new User
                 {
                     FirstName = registerDTO.FirstName,
@@ -40,13 +39,24 @@ namespace Inventory_Management_Backend.Repository
                     UserRoleID = registerDTO.UserRoleID
                 };
 
+                // Convert DateOnly to DateTime
+                var birthdayDateTime = new DateTime(newUser.Birthday.Year, newUser.Birthday.Month, newUser.Birthday.Day);
+
                 // Insert the new user and return the user ID
                 var query = @"
-            INSERT INTO user (user_first_name, user_last_name, user_email, user_password, user_birthday, user_role_id)
-            VALUES (@FirstName, @LastName, @Email, @Password, @Birthday, @UserRoleID)
-            RETURNING user_id;";
+        INSERT INTO public.""user"" (user_first_name, user_last_name, user_email, user_password, user_birth_date, user_role_id)
+        VALUES (@FirstName, @LastName, @Email, @Password, @Birthday, @UserRoleID)
+        RETURNING user_id_pkey AS UserID;";
 
-                int? userId = await connection.QuerySingleOrDefaultAsync<int>(query, newUser);
+                int? userId = await connection.QuerySingleOrDefaultAsync<int>(query, new
+                {
+                    newUser.FirstName,
+                    newUser.LastName,
+                    newUser.Email,
+                    newUser.Password,
+                    Birthday = birthdayDateTime,
+                    newUser.UserRoleID
+                });
 
                 if (!userId.HasValue)
                 {
