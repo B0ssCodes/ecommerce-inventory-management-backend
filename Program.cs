@@ -22,6 +22,16 @@ builder.Services.AddSwaggerGen(options => {
     });
 });
 
+// Configure CORS to allow any origin, header, and method
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", builder =>
+    {
+        builder.AllowAnyOrigin()
+               .AllowAnyHeader()
+               .AllowAnyMethod();
+    });
+});
 
 builder.Services.AddAuthentication(options =>
 {
@@ -32,14 +42,13 @@ builder.Services.AddAuthentication(options =>
 {
     options.TokenValidationParameters = new TokenValidationParameters
     {
-        ValidateIssuer = false, 
+        ValidateIssuer = false,
         ValidateAudience = false,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
     };
 });
-
 
 builder.Services.AddSingleton<DapperContext>();
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
@@ -56,6 +65,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseCors("AllowAll"); 
 app.UseAuthentication();
 app.UseAuthorization();
 
