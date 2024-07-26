@@ -53,6 +53,8 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddSingleton<DapperContext>();
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<IUserRoleRepository, UserRoleRepository>();
+builder.Services.AddScoped<IProductRepository, ProductRepository>();
+builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
 builder.Services.AddScoped<ApiResponse>();
 
 var app = builder.Build();

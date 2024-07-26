@@ -3,6 +3,7 @@ using Inventory_Management_Backend.Data;
 using Inventory_Management_Backend.Models;
 using Inventory_Management_Backend.Models.Dto;
 using Inventory_Management_Backend.Repository.IRepository;
+using System.Data;
 
 namespace Inventory_Management_Backend.Repository
 {
@@ -17,7 +18,7 @@ namespace Inventory_Management_Backend.Repository
 
         public async Task<UserRoleDTO> CreateUserRole(string roleName)
         {
-            using (var connection = _db.CreateConnection())
+            using (IDbConnection connection = _db.CreateConnection())
             {
                 var query = @"
             INSERT INTO user_role (role)
@@ -38,7 +39,7 @@ namespace Inventory_Management_Backend.Repository
 
         public async Task DeleteUserRole(int roleId)
         {
-            using (var connection = _db.CreateConnection())
+            using (IDbConnection connection = _db.CreateConnection())
             {
                 var query = "DELETE FROM user_role WHERE user_role_id_pkey = @Id";
 
@@ -49,7 +50,7 @@ namespace Inventory_Management_Backend.Repository
 
         public async Task<UserRoleDTO> GetUserRole(int userRoleId)
         {
-            using (var connection = _db.CreateConnection())
+            using (IDbConnection connection = _db.CreateConnection())
             {
                 var query = @"
                     SELECT user_role_id_pkey AS UserRoleID, role AS Role
@@ -69,7 +70,7 @@ namespace Inventory_Management_Backend.Repository
 
         public async Task<List<UserRoleDTO>> GetUserRoles()
         {
-            using (var connection = _db.CreateConnection())
+            using (IDbConnection connection = _db.CreateConnection())
             {
                 var query = @"
             SELECT user_role_id_pkey AS UserRoleID, role AS Role
@@ -86,7 +87,7 @@ namespace Inventory_Management_Backend.Repository
 
         public async Task<UserRoleDTO> UpdateUserRole(int roleId, string roleName)
         {
-            using (var connection = _db.CreateConnection())
+            using (IDbConnection connection = _db.CreateConnection())
             {
                 var query = @"
                     UPDATE user_role

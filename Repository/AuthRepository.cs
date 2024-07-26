@@ -5,6 +5,7 @@ using Inventory_Management_Backend.Models.Dto;
 using Inventory_Management_Backend.Repository.IRepository;
 using Inventory_Management_Backend.Utilities;
 using Microsoft.Extensions.Configuration;
+using System.Data;
 
 namespace Inventory_Management_Backend.Repository
 {
@@ -20,11 +21,11 @@ namespace Inventory_Management_Backend.Repository
         }
         public async Task Register(RegisterRequestDTO registerDTO)
         {
-            using (var connection = _db.CreateConnection())
+            using (IDbConnection connection = _db.CreateConnection())
             {
                 // Check if the user already exists by email
                 bool emailExists = await connection.QueryFirstOrDefaultAsync<bool>(
-                    "SELECT EXISTS(SELECT 1 FROM public.\"user\" WHERE user_email = @Email)",
+                    "SELECT EXISTS(SELECT 1 FROM public.\"user_info\" WHERE user_email = @Email)",
                     new { Email = registerDTO.Email });
 
                 if (emailExists)
@@ -47,7 +48,7 @@ namespace Inventory_Management_Backend.Repository
 
                 // Insert the new user and return the user ID
                 var query = @"
-        INSERT INTO public.""user"" (user_first_name, user_last_name, user_email, user_password, user_birth_date, user_role_id)
+        INSERT INTO public.""user_info"" (user_first_name, user_last_name, user_email, user_password, user_birth_date, user_role_id)
         VALUES (@FirstName, @LastName, @Email, @Password, @Birthday, @UserRoleID)
         RETURNING user_id_pkey AS UserID;";
 
@@ -70,7 +71,7 @@ namespace Inventory_Management_Backend.Repository
 
         public async Task<LoginResponseDTO> Login(LoginRequestDTO loginDTO)
         {
-            using (var connection = _db.CreateConnection())
+            using (IDbConnection connection = _db.CreateConnection())
             {
                 if (string.IsNullOrEmpty(loginDTO.Email) || string.IsNullOrEmpty(loginDTO.Password))
                 {
@@ -82,7 +83,7 @@ namespace Inventory_Management_Backend.Repository
             SELECT u.user_id_pkey AS UserId, u.user_first_name AS FirstName, u.user_last_name AS LastName, 
                    u.user_email AS Email, u.user_password AS Password, u.user_role_id AS UserRoleID,
                    r.role AS UserRole
-            FROM public.""user"" u
+            FROM public.""user_info"" u
             JOIN public.""user_role"" r ON u.user_role_id = r.user_role_id_pkey
             WHERE u.user_email = @Email";
 
