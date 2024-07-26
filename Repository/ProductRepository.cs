@@ -224,24 +224,29 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task<List<ProductResponseDTO>> GetProducts()
+        public async Task<List<ProductResponseDTO>> GetProducts(PaginationParams paginationParams)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
                 connection.Open(); // Explicitly open the connection
 
+                var offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
+
                 var query = @"
             SELECT 
-                p.product_id_pkey AS ProductID, 
-                p.sku AS SKU, 
-                p.product_name AS Name, 
-                p.product_description AS Description, 
-                p.product_price AS Price, 
-                p.product_cost_price AS Cost, 
-                p.category_id AS CategoryID
-            FROM product p;";
+                product_id_pkey AS ProductID, 
+                sku AS SKU, 
+                product_name AS Name, 
+                product_description AS Description, 
+                product_price AS Price, 
+                product_cost_price AS Cost, 
+                category_id AS CategoryID
+            FROM product
+            ORDER BY product_id_pkey
+            OFFSET @Offset ROWS
+            FETCH NEXT @PageSize ROWS ONLY;";
 
-                var products = (await connection.QueryAsync<ProductResponseDTO>(query)).ToList();
+                var products = (await connection.QueryAsync<ProductResponseDTO>(query, new { Offset = offset, PageSize = paginationParams.PageSize })).ToList();
 
                 if (products == null || products.Count == 0)
                 {

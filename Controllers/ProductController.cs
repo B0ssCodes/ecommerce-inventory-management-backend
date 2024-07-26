@@ -18,13 +18,13 @@ namespace Inventory_Management_Backend.Controllers
             _response = response;
         }
 
-        [HttpGet]
+        [HttpPost]
         [Route("get")]
-        public async Task<IActionResult> GetProducts()
+        public async Task<IActionResult> GetProducts(PaginationParams paginationParams)
         {
             try
             {
-                List<ProductResponseDTO> products = await _productRepository.GetProducts();
+                List<ProductResponseDTO> products = await _productRepository.GetProducts(paginationParams);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Products retrieved successfully";
