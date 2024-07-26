@@ -81,13 +81,13 @@ namespace Inventory_Management_Backend.Controllers
             }
             catch (Exception ex)
             {
-               _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.StatusCode = HttpStatusCode.BadRequest;
                 _response.IsSuccess = false;
                 _response.Message = ex.Message;
                 _response.Result = null;
                 return BadRequest(_response);
             }
-        }   
+        }
 
         [HttpDelete]
         [Route("delete/{categoryID}")]
