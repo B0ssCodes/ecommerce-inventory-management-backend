@@ -2,5 +2,5 @@
 
 public class ImageRequestDTO
 {
-    public string Url { get; set; }
+    public IFormFile Image { get; set; }
 }
