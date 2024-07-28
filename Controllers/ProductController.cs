@@ -36,7 +36,7 @@ namespace Inventory_Management_Backend.Controllers
                 _response.StatusCode = HttpStatusCode.BadRequest;
                 _response.IsSuccess = false;
                 _response.Message = ex.Message;
-                _response.Result = null;
+                _response.Result = default;
                 return BadRequest(_response);
             }
         }
@@ -74,7 +74,8 @@ namespace Inventory_Management_Backend.Controllers
 
         [HttpPost]
         [Route("create")]
-        public async Task<IActionResult> CreateProduct([FromBody] ProductRequestDTO productDTO)
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> CreateProduct([FromForm] ProductRequestDTO productDTO)
         {
             try
             {
@@ -90,7 +91,7 @@ namespace Inventory_Management_Backend.Controllers
                 _response.StatusCode = HttpStatusCode.BadRequest;
                 _response.IsSuccess = false;
                 _response.Message = ex.Message;
-                _response.Result = null;
+                _response.Result = default;
                 return BadRequest(_response);
             }
         }
@@ -105,7 +106,7 @@ namespace Inventory_Management_Backend.Controllers
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Product deleted successfully";
-                _response.Result = null;
+                _response.Result = default;
                 return Ok(_response);
             }
             catch (Exception ex)
@@ -113,7 +114,7 @@ namespace Inventory_Management_Backend.Controllers
                 _response.StatusCode = HttpStatusCode.BadRequest;
                 _response.IsSuccess = false;
                 _response.Message = ex.Message;
-                _response.Result = null;
+                _response.Result = default;
                 return BadRequest(_response);
             }
         }
@@ -136,7 +137,7 @@ namespace Inventory_Management_Backend.Controllers
                 _response.StatusCode = HttpStatusCode.BadRequest;
                 _response.IsSuccess = false;
                 _response.Message = ex.Message;
-                _response.Result = null;
+                _response.Result = default;
                 return BadRequest(_response);
             }
         }

@@ -74,7 +74,7 @@ namespace Inventory_Management_Backend.Repository
 
                         foreach (var imageRequest in productRequestDTO.Images)
                         {
-                            var image = imageRequest.Image;
+                            var image = imageRequest;
 
                             // Generate a unique name for the image
                             var uniqueFileName = $"{insertedProduct.ProductID}/{Guid.NewGuid()}_{Path.GetFileName(image.FileName)}";
@@ -354,7 +354,7 @@ namespace Inventory_Management_Backend.Repository
 
                         foreach (var imageRequest in productRequestDTO.Images)
                         {
-                            var image = imageRequest.Image;
+                            var image = imageRequest;
 
                             // Generate a unique name for the image
                             var uniqueFileName = $"{productID}/{Guid.NewGuid()}_{Path.GetFileName(image.FileName)}";

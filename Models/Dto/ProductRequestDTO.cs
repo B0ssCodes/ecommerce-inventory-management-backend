@@ -8,6 +8,6 @@
         public decimal Price { get; set; }
         public decimal Cost { get; set; }
         public int CategoryID { get; set; }
-        public List<ImageRequestDTO> Images { get; set; }
+        public List<IFormFile> Images { get; set; }
     }
 }
