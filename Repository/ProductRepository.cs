@@ -255,7 +255,7 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task<List<ProductResponseDTO>> GetProducts(PaginationParams paginationParams)
+        public async Task<List<AllProductResponseDTO>> GetProducts(PaginationParams paginationParams)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
@@ -264,31 +264,33 @@ namespace Inventory_Management_Backend.Repository
                 var offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
 
                 var query = @"
-            SELECT 
-                product_id_pkey AS ProductID, 
-                sku AS SKU, 
-                product_name AS Name, 
-                product_description AS Description, 
-                product_price AS Price, 
-                product_cost_price AS Cost, 
-                category_id AS CategoryID
-            FROM product
-            ORDER BY product_id_pkey
-            OFFSET @Offset ROWS
-            FETCH NEXT @PageSize ROWS ONLY;";
+                    SELECT 
+                        p.product_id_pkey AS ProductID, 
+                        p.sku AS SKU, 
+                        p.product_name AS Name, 
+                        p.product_description AS Description, 
+                        p.product_price AS Price, 
+                        p.product_cost_price AS Cost, 
+                        p.category_id AS CategoryID,
+                        (SELECT COUNT(*) FROM image WHERE product_id = p.product_id_pkey) AS ImageCount
+                    FROM product p
+                    ORDER BY p.product_id_pkey
+                    OFFSET @Offset ROWS
+                    FETCH NEXT @PageSize ROWS ONLY;";
 
-                var products = (await connection.QueryAsync<ProductResponseDTO>(query, new { Offset = offset, PageSize = paginationParams.PageSize })).ToList();
+                var products = (await connection.QueryAsync<AllProductResponseDTO>(query, new { Offset = offset, PageSize = paginationParams.PageSize })).ToList();
 
                 if (products == null || products.Count == 0)
                 {
-                    return new List<ProductResponseDTO>(); // Return an empty list if no products are found
+                    return new List<AllProductResponseDTO>(); // Return an empty list if no products are found
                 }
 
                 // Fetch the images and category details related to each product
-                var fetchImagesQuery = @"
-            SELECT image_id_pkey AS ImageID, image_url AS Url, product_id AS ProductID
-            FROM image
-            WHERE product_id = @ProductID";
+                // Removed fetch images when getting all products, more optimized.
+            //    var fetchImagesQuery = @"
+            //SELECT image_id_pkey AS ImageID, image_url AS Url, product_id AS ProductID
+            //FROM image
+            //WHERE product_id = @ProductID";
 
                 var fetchCategoryQuery = @"
             SELECT category_id_pkey AS CategoryID, category_name AS Name
@@ -297,9 +299,9 @@ namespace Inventory_Management_Backend.Repository
 
                 foreach (var product in products)
                 {
-                    // Fetch images
-                    var images = (await connection.QueryAsync<ImageResponseDTO>(fetchImagesQuery, new { ProductID = product.ProductID })).ToList();
-                    product.Images = images;
+                    //// Fetch images
+                    //var images = (await connection.QueryAsync<ImageResponseDTO>(fetchImagesQuery, new { ProductID = product.ProductID })).ToList();
+                    //product.Images = images;
 
                     // Fetch category
                     var category = await connection.QuerySingleOrDefaultAsync<CategoryResponseDTO>(fetchCategoryQuery, new { CategoryID = product.CategoryID });

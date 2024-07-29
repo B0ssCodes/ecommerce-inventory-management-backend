@@ -24,7 +24,7 @@ namespace Inventory_Management_Backend.Controllers
         {
             try
             {
-                List<ProductResponseDTO> products = await _productRepository.GetProducts(paginationParams);
+                List<AllProductResponseDTO> products = await _productRepository.GetProducts(paginationParams);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Products retrieved successfully";
