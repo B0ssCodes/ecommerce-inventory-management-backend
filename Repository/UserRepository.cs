@@ -72,20 +72,26 @@ namespace Inventory_Management_Backend.Repository
                 var offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
                 var searchQuery = paginationParams.Search;
 
+                // CTE to get total count of users (recommended by copilot)
                 var query = @"
-        SELECT 
-               u.user_id_pkey AS UserID,
-               u.user_first_name AS FirstName,
-               u.user_last_name AS LastName, 
-               u.user_email AS Email, 
-               r.role AS Role
-        FROM user_info u
-        INNER JOIN user_role r ON u.user_role_id = r.user_role_id_pkey
-        WHERE (@SearchQuery IS NULL OR 
-               u.user_first_name ILIKE '%' || @SearchQuery || '%' OR 
-               u.user_last_name ILIKE '%' || @SearchQuery || '%' OR 
-               u.user_email ILIKE '%' || @SearchQuery || '%')
-        ORDER BY u.user_first_name
+        WITH UserCTE AS (
+            SELECT 
+                u.user_id_pkey AS UserID,
+                u.user_first_name AS FirstName,
+                u.user_last_name AS LastName, 
+                u.user_email AS Email, 
+                r.role AS Role,
+                COUNT(*) OVER() AS UserCount
+            FROM user_info u
+            INNER JOIN user_role r ON u.user_role_id = r.user_role_id_pkey
+            WHERE (@SearchQuery IS NULL OR 
+                   u.user_first_name ILIKE '%' || @SearchQuery || '%' OR 
+                   u.user_last_name ILIKE '%' || @SearchQuery || '%' OR 
+                   u.user_email ILIKE '%' || @SearchQuery || '%')
+        )
+        SELECT *
+        FROM UserCTE
+        ORDER BY FirstName
         OFFSET @Offset ROWS
         FETCH NEXT @PageSize ROWS ONLY;";
 
