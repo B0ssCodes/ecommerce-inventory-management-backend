@@ -4,6 +4,7 @@ using Inventory_Management_Backend.Repository;
 using Inventory_Management_Backend.Repository.IRepository;
 using Inventory_Management_Backend.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
@@ -12,7 +13,6 @@ using Azure.Storage.Blobs;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -29,9 +29,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", builder =>
     {
-        builder.AllowAnyOrigin()
+        builder.WithOrigins("http://localhost:5173")
                .AllowAnyHeader()
-               .AllowAnyMethod();
+               .AllowAnyMethod()
+               .AllowCredentials();
     });
 });
 
@@ -84,7 +85,34 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseCors("AllowAll");
+
+// Major error was applying cors after static files, always apply before
+app.UseCors("AllowAll"); 
+
+// Enable serving static files to get images in frontend
+app.UseStaticFiles(); 
+
+// Get the images directory from appsettings.json
+var imagesDirectory = builder.Configuration["ImagesDirectory"];
+if (string.IsNullOrEmpty(imagesDirectory))
+{
+    throw new InvalidOperationException("Images directory is not configured.");
+}
+
+// Get the absolute path of the images directory, if it does not exist, create it
+var absoluteImagesDirectory = Path.GetFullPath(imagesDirectory);
+if (!Directory.Exists(absoluteImagesDirectory))
+{
+    Directory.CreateDirectory(absoluteImagesDirectory);
+}
+
+// Serve the images directory as static files to the provided url
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(absoluteImagesDirectory),
+    RequestPath = "/images"
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 

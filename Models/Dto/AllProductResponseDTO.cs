@@ -8,6 +8,7 @@
         public string Description { get; set; }
         public decimal Price { get; set; }
         public decimal Cost { get; set; }
+        public int ProductCount { get; set; }
         public int ImageCount { get; set; }
         public int CategoryID { get; set; }
         public CategoryResponseDTO Category { get; set; }

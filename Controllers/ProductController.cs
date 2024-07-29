@@ -74,6 +74,7 @@ namespace Inventory_Management_Backend.Controllers
 
         [HttpPost]
         [Route("create")]
+        // Setup the create as form data to receive the images
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> CreateProduct([FromForm] ProductRequestDTO productDTO)
         {
@@ -121,7 +122,9 @@ namespace Inventory_Management_Backend.Controllers
 
         [HttpPut]
         [Route("update/{productID}")]
-        public async Task<IActionResult> UpdateProduct(int productID, [FromBody] ProductRequestDTO productDTO)
+        // Setup the update as form data to receive the images
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UpdateProduct(int productID, [FromForm] ProductRequestDTO productDTO)
         {
             try
             {

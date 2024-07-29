@@ -12,23 +12,25 @@ namespace Inventory_Management_Backend.Repository
     public class ProductRepository : IProductRepository
     {
         private readonly DapperContext _db;
-        private readonly IBlobService _blobService;
+        private readonly IConfiguration _configuration;
 
-        public ProductRepository(DapperContext db, IBlobService blobService)
+        public ProductRepository(DapperContext db, IConfiguration configuration)
         {
             _db = db;
-            _blobService = blobService;
+            _configuration = configuration;
         }
         public async Task<ProductResponseDTO> CreateProduct(ProductRequestDTO productRequestDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
-                connection.Open(); // Explicitly open the connection
+                connection.Open(); // Explicitly open the connection, didnt work without this
 
+                // Start a transaction to ensure data consistency in dapper
                 using (IDbTransaction transaction = connection.BeginTransaction())
                 {
                     try
                     {
+                        // Check if a product with the same SKU already exists
                         var checkSkuQuery = @"
                     SELECT EXISTS (
                         SELECT 1
@@ -41,6 +43,7 @@ namespace Inventory_Management_Backend.Repository
                             productRequestDTO.SKU
                         }, transaction);
 
+                        // If a product with the same SKU exists, throw an exception
                         if (skuExists)
                         {
                             throw new Exception("A product with the same SKU already exists.");
@@ -48,9 +51,9 @@ namespace Inventory_Management_Backend.Repository
 
                         // Insert the product and return all available details
                         var query = @"
-                    INSERT INTO Product (sku, product_name, product_description, product_price, product_cost_price, category_id)
-                    VALUES (@SKU, @Name, @Description, @Price, @Cost, @CategoryID)
-                    RETURNING product_id_pkey AS ProductID, sku AS SKU, product_name as Name, product_description as Description, product_price AS Price, product_cost_price as Cost, category_id AS CategoryID";
+                INSERT INTO Product (sku, product_name, product_description, product_price, product_cost_price, category_id)
+                VALUES (@SKU, @Name, @Description, @Price, @Cost, @CategoryID)
+                RETURNING product_id_pkey AS ProductID, sku AS SKU, product_name as Name, product_description as Description, product_price AS Price, product_cost_price as Cost, category_id AS CategoryID";
 
                         var insertedProduct = await connection.QuerySingleOrDefaultAsync<ProductResponseDTO>(query, new
                         {
@@ -67,34 +70,59 @@ namespace Inventory_Management_Backend.Repository
                             throw new Exception("Product creation failed");
                         }
 
-                        // Upload images to Azure Blob Storage and insert image URLs into the database
+                        // Get the images directory from the configuration file (appsettings.json)
+                        var imagesDirectory = _configuration["ImagesDirectory"];
+                        if (string.IsNullOrEmpty(imagesDirectory))
+                        {
+                            throw new Exception("Images directory is not configured.");
+                        }
+
+                        // Create a directory for the product if it doesn't exist
+                        // it should exist as program.cs will create it but just to make sure
+                        // The directory create will have for a name the productID
+                        var productDirectory = Path.Combine(imagesDirectory, insertedProduct.ProductID.ToString());
+                        if (!Directory.Exists(productDirectory))
+                        {
+                            Directory.CreateDirectory(productDirectory);
+                        }
+
+                        // Save images locally and insert realtive image paths into the database
                         var imageQuery = @"
-                    INSERT INTO image (product_id, image_url)
-                    VALUES (@ProductID, @ImageUrl)";
+                INSERT INTO image (product_id, image_url)
+                VALUES (@ProductID, @ImageUrl)";
 
                         foreach (var imageRequest in productRequestDTO.Images)
                         {
                             var image = imageRequest;
 
                             // Generate a unique name for the image
-                            var uniqueFileName = $"{insertedProduct.ProductID}/{Guid.NewGuid()}_{Path.GetFileName(image.FileName)}";
+                            var uniqueFileName = $"{Guid.NewGuid()}_{Path.GetFileName(image.FileName)}";
 
-                            // Upload the image to Azure Blob Storage using BlobService
-                            var imageUrl = await _blobService.UploadBlob(uniqueFileName, "product-images", image);
+                            // Construct the file path with the directory and the new file name
+                            var filePath = Path.Combine(productDirectory, uniqueFileName);
 
-                            // Insert image URL into the database
+                            // Save the image locally
+                            using (var stream = new FileStream(filePath, FileMode.Create))
+                            {
+                                await image.CopyToAsync(stream);
+                            }
+
+                            // Create a relative URL for the image, replacing backslashes with forward slashes
+                            var relativeImageUrl = Path.Combine("/images", insertedProduct.ProductID.ToString(), uniqueFileName).Replace("\\", "/");
+
+                            // Insert relative image path into the database
                             await connection.ExecuteAsync(imageQuery, new
                             {
                                 ProductID = insertedProduct.ProductID,
-                                ImageUrl = imageUrl
+                                ImageUrl = relativeImageUrl
                             }, transaction);
                         }
 
                         // Fetch the inserted images
                         var fetchImagesQuery = @"
-                    SELECT image_id_pkey AS ImageID, image_url AS Url
-                    FROM image
-                    WHERE product_id = @ProductID";
+                SELECT image_id_pkey AS ImageID, image_url AS Url
+                FROM image
+                WHERE product_id = @ProductID";
 
                         var images = (await connection.QueryAsync<ImageResponseDTO>(fetchImagesQuery, new
                         {
@@ -103,9 +131,9 @@ namespace Inventory_Management_Backend.Repository
 
                         // Get the category details based on the passed ID
                         var categoryQuery = @"
-                    SELECT category_id_pkey AS CategoryID, category_name AS Name
-                    FROM Category
-                    WHERE category_id_pkey = @CategoryID";
+                SELECT category_id_pkey AS CategoryID, category_name AS Name
+                FROM Category
+                WHERE category_id_pkey = @CategoryID";
 
                         var category = await connection.QuerySingleOrDefaultAsync<CategoryResponseDTO>(categoryQuery, new
                         {
@@ -148,11 +176,11 @@ namespace Inventory_Management_Backend.Repository
                     {
                         // Check if the product exists before deleting it
                         var checkProductQuery = @"
-                    SELECT EXISTS (
-                        SELECT 1
-                        FROM product
-                        WHERE product_id_pkey = @ProductID
-                    )";
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM product
+                    WHERE product_id_pkey = @ProductID
+                )";
 
                         var productExists = await connection.ExecuteScalarAsync<bool>(checkProductQuery, new { ProductID = productID }, transaction);
                         if (!productExists)
@@ -160,7 +188,7 @@ namespace Inventory_Management_Backend.Repository
                             throw new Exception("Product not found");
                         }
 
-                        // Fetch existing images to delete them from Azure Blob Storage
+                        // Fetch existing images to delete them from the local directory
                         var fetchExistingImagesQuery = @"
                 SELECT image_url AS Url
                 FROM image
@@ -175,12 +203,6 @@ namespace Inventory_Management_Backend.Repository
 
                         await connection.ExecuteAsync(deleteImagesQuery, new { ProductID = productID }, transaction);
 
-                        // Delete existing images from Azure Blob Storage
-                        foreach (var imageUrl in existingImages)
-                        {
-                            await _blobService.DeleteBlob(imageUrl, "product-images");
-                        }
-
                         // Delete the product
                         var deleteProductQuery = @"
                 DELETE FROM product
@@ -190,6 +212,23 @@ namespace Inventory_Management_Backend.Repository
 
                         // Commit the transaction when done
                         transaction.Commit();
+
+                        // Get the images directory from the configuration
+                        var imagesDirectory = _configuration["ImagesDirectory"];
+                        if (string.IsNullOrEmpty(imagesDirectory))
+                        {
+                            throw new Exception("Images directory is not configured.");
+                        }
+
+                        // Construct the product directory using the productID
+                        var productDirectory = Path.Combine(imagesDirectory, productID.ToString());
+
+                        // Delete the product directory and all its contents
+                        if (Directory.Exists(productDirectory))
+                        {
+                            Directory.Delete(productDirectory, true);
+                        }
+
                         return true;
                     }
                     catch
@@ -209,16 +248,16 @@ namespace Inventory_Management_Backend.Repository
                 connection.Open(); // Explicitly open the connection
 
                 var query = @"
-            SELECT 
-                product_id_pkey AS ProductID, 
-                sku AS SKU, 
-                product_name AS Name, 
-                product_description AS Description, 
-                product_price AS Price, 
-                product_cost_price AS Cost, 
-                category_id AS CategoryID
-            FROM product
-            WHERE product_id_pkey = @ProductID";
+        SELECT 
+            product_id_pkey AS ProductID, 
+            sku AS SKU, 
+            product_name AS Name, 
+            product_description AS Description, 
+            product_price AS Price, 
+            product_cost_price AS Cost, 
+            category_id AS CategoryID
+        FROM product
+        WHERE product_id_pkey = @ProductID";
 
                 var product = await connection.QuerySingleOrDefaultAsync<ProductResponseDTO>(query, new { ProductID = productID });
 
@@ -227,20 +266,20 @@ namespace Inventory_Management_Backend.Repository
                     return null; // Or handle the case where the product is not found
                 }
 
-                // Fetch the images related to the product
+                // Fetch the images related to the product and serve them as static files
                 var fetchImagesQuery = @"
-            SELECT image_id_pkey AS ImageID, image_url AS Url
-            FROM image
-            WHERE product_id = @ProductID";
+        SELECT image_id_pkey AS ImageID, image_url AS Url
+        FROM image
+        WHERE product_id = @ProductID";
 
                 var images = (await connection.QueryAsync<ImageResponseDTO>(fetchImagesQuery, new { ProductID = productID })).ToList();
                 product.Images = images;
 
                 // Fetch the category details
                 var fetchCategoryQuery = @"
-            SELECT category_id_pkey AS CategoryID, category_name AS Name
-            FROM category
-            WHERE category_id_pkey = @CategoryID";
+        SELECT category_id_pkey AS CategoryID, category_name AS Name
+        FROM category
+        WHERE category_id_pkey = @CategoryID";
 
                 var category = await connection.QuerySingleOrDefaultAsync<CategoryResponseDTO>(fetchCategoryQuery, new { CategoryID = product.CategoryID });
 
@@ -255,6 +294,7 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
+        
         public async Task<List<AllProductResponseDTO>> GetProducts(PaginationParams paginationParams)
         {
             using (IDbConnection connection = _db.CreateConnection())
@@ -264,19 +304,20 @@ namespace Inventory_Management_Backend.Repository
                 var offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
 
                 var query = @"
-                    SELECT 
-                        p.product_id_pkey AS ProductID, 
-                        p.sku AS SKU, 
-                        p.product_name AS Name, 
-                        p.product_description AS Description, 
-                        p.product_price AS Price, 
-                        p.product_cost_price AS Cost, 
-                        p.category_id AS CategoryID,
-                        (SELECT COUNT(*) FROM image WHERE product_id = p.product_id_pkey) AS ImageCount
-                    FROM product p
-                    ORDER BY p.product_id_pkey
-                    OFFSET @Offset ROWS
-                    FETCH NEXT @PageSize ROWS ONLY;";
+        SELECT 
+            p.product_id_pkey AS ProductID, 
+            p.sku AS SKU, 
+            p.product_name AS Name, 
+            p.product_description AS Description, 
+            p.product_price AS Price, 
+            p.product_cost_price AS Cost, 
+            p.category_id AS CategoryID,
+            (SELECT COUNT(*) FROM image WHERE product_id = p.product_id_pkey) AS ImageCount,
+            (SELECT COUNT(*) FROM product) AS ProductCount
+        FROM product p
+        ORDER BY p.product_id_pkey
+        OFFSET @Offset ROWS
+        FETCH NEXT @PageSize ROWS ONLY;";
 
                 var products = (await connection.QueryAsync<AllProductResponseDTO>(query, new { Offset = offset, PageSize = paginationParams.PageSize })).ToList();
 
@@ -285,24 +326,18 @@ namespace Inventory_Management_Backend.Repository
                     return new List<AllProductResponseDTO>(); // Return an empty list if no products are found
                 }
 
-                // Fetch the images and category details related to each product
-                // Removed fetch images when getting all products, more optimized.
-            //    var fetchImagesQuery = @"
-            //SELECT image_id_pkey AS ImageID, image_url AS Url, product_id AS ProductID
-            //FROM image
-            //WHERE product_id = @ProductID";
-
                 var fetchCategoryQuery = @"
-            SELECT category_id_pkey AS CategoryID, category_name AS Name
-            FROM category
-            WHERE category_id_pkey = @CategoryID";
+        SELECT category_id_pkey AS CategoryID, category_name AS Name
+        FROM category
+        WHERE category_id_pkey = @CategoryID";
+
+                var fetchImagesQuery = @"
+        SELECT image_id_pkey AS ImageID, image_url AS Url
+        FROM image
+        WHERE product_id = @ProductID";
 
                 foreach (var product in products)
                 {
-                    //// Fetch images
-                    //var images = (await connection.QueryAsync<ImageResponseDTO>(fetchImagesQuery, new { ProductID = product.ProductID })).ToList();
-                    //product.Images = images;
-
                     // Fetch category
                     var category = await connection.QuerySingleOrDefaultAsync<CategoryResponseDTO>(fetchCategoryQuery, new { CategoryID = product.CategoryID });
 
@@ -328,7 +363,7 @@ namespace Inventory_Management_Backend.Repository
                 {
                     try
                     {
-                        // Fetch existing images to delete them from Azure Blob Storage
+                        // Fetch existing images to delete them from the local directory
                         var fetchExistingImagesQuery = @"
                 SELECT image_url AS Url
                 FROM image
@@ -343,11 +378,24 @@ namespace Inventory_Management_Backend.Repository
 
                         await connection.ExecuteAsync(deleteImagesQuery, new { ProductID = productID }, transaction);
 
-                        // Delete existing images from Azure Blob Storage
-                        foreach (var imageUrl in existingImages)
+                        // Get the images directory from the configuration
+                        var imagesDirectory = _configuration["ImagesDirectory"];
+                        if (string.IsNullOrEmpty(imagesDirectory))
                         {
-                            await _blobService.DeleteBlob(imageUrl, "product-images");
+                            throw new Exception("Images directory is not configured.");
                         }
+
+                        // Construct the product directory path
+                        var productDirectory = Path.Combine(imagesDirectory, productID.ToString());
+
+                        // Delete the product directory and all its contents
+                        if (Directory.Exists(productDirectory))
+                        {
+                            Directory.Delete(productDirectory, true);
+                        }
+
+                        // Create a new directory for the product
+                        Directory.CreateDirectory(productDirectory);
 
                         // Insert new images
                         var insertImageQuery = @"
@@ -359,16 +407,23 @@ namespace Inventory_Management_Backend.Repository
                             var image = imageRequest;
 
                             // Generate a unique name for the image
-                            var uniqueFileName = $"{productID}/{Guid.NewGuid()}_{Path.GetFileName(image.FileName)}";
+                            var uniqueFileName = $"{Guid.NewGuid()}_{Path.GetFileName(image.FileName)}";
+                            var filePath = Path.Combine(productDirectory, uniqueFileName);
 
-                            // Upload the image to Azure Blob Storage using BlobService
-                            var imageUrl = await _blobService.UploadBlob(uniqueFileName, "product-images", image);
+                            // Save the image locally
+                            using (var stream = new FileStream(filePath, FileMode.Create))
+                            {
+                                await image.CopyToAsync(stream);
+                            }
 
-                            // Insert image URL into the database
+                            // Create a relative URL for the image
+                            var relativeImageUrl = Path.Combine("/images", productID.ToString(), uniqueFileName).Replace("\\", "/");
+
+                            // Insert image path into the database
                             await connection.ExecuteAsync(insertImageQuery, new
                             {
                                 ProductID = productID,
-                                ImageUrl = imageUrl
+                                ImageUrl = relativeImageUrl
                             }, transaction);
                         }
 
