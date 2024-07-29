@@ -294,7 +294,7 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        
+
         public async Task<List<AllProductResponseDTO>> GetProducts(PaginationParams paginationParams)
         {
             using (IDbConnection connection = _db.CreateConnection())
@@ -315,13 +315,16 @@ namespace Inventory_Management_Backend.Repository
             (SELECT COUNT(*) FROM image WHERE product_id = p.product_id_pkey) AS ImageCount,
             (SELECT COUNT(*) FROM product) AS ProductCount
         FROM product p
+        WHERE (@SearchQuery IS NULL OR p.product_name ILIKE '%' || @SearchQuery || '%' 
+               OR p.product_description ILIKE '%' || @SearchQuery || '%' 
+               OR p.sku ILIKE '%' || @SearchQuery || '%')
         ORDER BY p.product_id_pkey
         OFFSET @Offset ROWS
         FETCH NEXT @PageSize ROWS ONLY;";
 
-                var products = (await connection.QueryAsync<AllProductResponseDTO>(query, new { Offset = offset, PageSize = paginationParams.PageSize })).ToList();
+                var products = (await connection.QueryAsync<AllProductResponseDTO>(query, new { Offset = offset, PageSize = paginationParams.PageSize, SearchQuery = paginationParams.Search })).ToList();
 
-                if (products == null || products.Count == 0)
+                if (products == null)
                 {
                     return new List<AllProductResponseDTO>(); // Return an empty list if no products are found
                 }
@@ -330,11 +333,6 @@ namespace Inventory_Management_Backend.Repository
         SELECT category_id_pkey AS CategoryID, category_name AS Name
         FROM category
         WHERE category_id_pkey = @CategoryID";
-
-                var fetchImagesQuery = @"
-        SELECT image_id_pkey AS ImageID, image_url AS Url
-        FROM image
-        WHERE product_id = @ProductID";
 
                 foreach (var product in products)
                 {
@@ -352,7 +350,6 @@ namespace Inventory_Management_Backend.Repository
                 return products;
             }
         }
-
         public async Task<ProductResponseDTO> UpdateProduct(int productID, ProductRequestDTO productRequestDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())
