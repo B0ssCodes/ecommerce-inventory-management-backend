@@ -1,10 +1,8 @@
-﻿using Azure.Storage.Blobs;
-using Dapper;
+﻿using Dapper;
 using Inventory_Management_Backend.Data;
 using Inventory_Management_Backend.Models;
 using Inventory_Management_Backend.Models.Dto;
 using Inventory_Management_Backend.Repository.IRepository;
-using Inventory_Management_Backend.Services;
 using System.Data;
 
 namespace Inventory_Management_Backend.Repository

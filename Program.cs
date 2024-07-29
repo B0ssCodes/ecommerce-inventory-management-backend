@@ -2,13 +2,11 @@ using Inventory_Management_Backend.Data;
 using Inventory_Management_Backend.Models;
 using Inventory_Management_Backend.Repository;
 using Inventory_Management_Backend.Repository.IRepository;
-using Inventory_Management_Backend.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
-using Azure.Storage.Blobs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -66,14 +64,13 @@ if (string.IsNullOrEmpty(azureStorageConnectionString))
     throw new InvalidOperationException("Azure Storage connection string is not configured.");
 }
 
-builder.Services.AddSingleton(new BlobServiceClient(azureStorageConnectionString));
 builder.Services.AddSingleton<DapperContext>();
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<IUserRoleRepository, UserRoleRepository>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ApiResponse>();
-builder.Services.AddScoped<IBlobService, BlobService>();
 
 var app = builder.Build();
 

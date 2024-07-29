@@ -41,9 +41,6 @@ namespace Inventory_Management_Backend.Controllers
                 _apiResponse.Result = null;
                 return BadRequest(_apiResponse);
             }
-            
-
-
         }
 
         [HttpPost]
