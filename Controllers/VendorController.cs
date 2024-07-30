@@ -90,7 +90,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPut]
-        [Route("update")]
+        [Route("update/{vendorID}")]
         public async Task<IActionResult> UpdateVendor(int vendorID, VendorRequestDTO vendorRequestDTO)
         {
             try

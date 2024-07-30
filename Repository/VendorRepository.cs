@@ -125,11 +125,6 @@ namespace Inventory_Management_Backend.Repository
                 };
 
                 List<VendorResponseDTO> vendors = (await connection.QueryAsync<VendorResponseDTO>(query, parameters)).ToList();
-
-                if (vendors.Count == 0)
-                {
-                    throw new Exception("No vendors found");
-                }
                 return vendors;
             }
         }
