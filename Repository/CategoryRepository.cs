@@ -135,7 +135,7 @@ namespace Inventory_Management_Backend.Repository
             {
                 var query = @"
             UPDATE category
-            SET category_name = @Name
+            SET category_name = @Name,
                 category_description = @Description
             WHERE category_id_pkey = @CategoryID";
 
