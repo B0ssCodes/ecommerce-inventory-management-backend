@@ -20,13 +20,13 @@ namespace Inventory_Management_Backend.Controllers
             _response = response;
         }
 
-        [HttpGet]
+        [HttpPost]
         [Route("get")]
-        public async Task<IActionResult> GetCategories()
+        public async Task<IActionResult> GetCategories(PaginationParams paginationParams)
         {
             try
             {
-                List<CategoryResponseDTO> response = await _categoryRepository.GetCategories();
+                List<CategoryResponseDTO> response = await _categoryRepository.GetCategories(paginationParams);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Categories retrieved successfully";
@@ -38,7 +38,7 @@ namespace Inventory_Management_Backend.Controllers
                 _response.StatusCode = HttpStatusCode.BadRequest;
                 _response.IsSuccess = false;
                 _response.Message = ex.Message;
-                _response.Result = null;
+                _response.Result = default;
                 return BadRequest(_response);
             }
         }
@@ -61,22 +61,22 @@ namespace Inventory_Management_Backend.Controllers
                 _response.StatusCode = HttpStatusCode.BadRequest;
                 _response.IsSuccess = false;
                 _response.Message = ex.Message;
-                _response.Result = null;
+                _response.Result = default;
                 return BadRequest(_response);
             }
         }
 
         [HttpPost]
         [Route("create")]
-        public async Task<IActionResult> CreateCategory([FromBody] string categoryName)
+        public async Task<IActionResult> CreateCategory(CategoryRequestDTO categoryDTO)
         {
             try
             {
-                CategoryResponseDTO category = await _categoryRepository.CreateCategory(categoryName);
+                await _categoryRepository.CreateCategory(categoryDTO);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Category created successfully";
-                _response.Result = category;
+                _response.Result = default;
                 return Ok(_response);
             }
             catch (Exception ex)
@@ -84,7 +84,7 @@ namespace Inventory_Management_Backend.Controllers
                 _response.StatusCode = HttpStatusCode.BadRequest;
                 _response.IsSuccess = false;
                 _response.Message = ex.Message;
-                _response.Result = null;
+                _response.Result = default;
                 return BadRequest(_response);
             }
         }
@@ -95,11 +95,11 @@ namespace Inventory_Management_Backend.Controllers
         {
             try
             {
-                bool response = await _categoryRepository.DeleteCategory(categoryID);
+                await _categoryRepository.DeleteCategory(categoryID);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Category deleted successfully";
-                _response.Result = response;
+                _response.Result = default;
                 return Ok(_response);
             }
             catch (Exception ex)
@@ -107,22 +107,22 @@ namespace Inventory_Management_Backend.Controllers
                 _response.StatusCode = HttpStatusCode.BadRequest;
                 _response.IsSuccess = false;
                 _response.Message = ex.Message;
-                _response.Result = null;
+                _response.Result = default;
                 return BadRequest(_response);
             }
         }
 
         [HttpPut]
-        [Route("update")]
-        public async Task<IActionResult> UpdateCategory(CategoryRequestDTO requestDTO)
+        [Route("update/{categoryID}")]
+        public async Task<IActionResult> UpdateCategory(int categoryID, CategoryRequestDTO requestDTO)
         {
             try
             {
-                CategoryResponseDTO category = await _categoryRepository.UpdateCategory(requestDTO);
+                await _categoryRepository.UpdateCategory(categoryID, requestDTO);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Category updated successfully";
-                _response.Result = category;
+                _response.Result = default;
                 return Ok(_response);
             }
             catch (Exception ex)
@@ -130,7 +130,7 @@ namespace Inventory_Management_Backend.Controllers
                 _response.StatusCode = HttpStatusCode.BadRequest;
                 _response.IsSuccess = false;
                 _response.Message = ex.Message;
-                _response.Result = null;
+                _response.Result = default;
                 return BadRequest(_response);
             }
         }

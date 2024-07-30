@@ -55,6 +55,8 @@ nunit-*.xml
 [Rr]eleasePS/
 dlldata.c
 
+# Ignore images
+ProductImages/
 # Benchmark Results
 BenchmarkDotNet.Artifacts/
 
