@@ -69,7 +69,7 @@ namespace Inventory_Management_Backend.Repository
         }
 
 
-        public async Task<List<CategoryResponseDTO>> GetCategories(PaginationParams paginationParams)
+        public async Task<(List<CategoryResponseDTO>, int ItemCount)> GetCategories(PaginationParams paginationParams)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
@@ -79,22 +79,22 @@ namespace Inventory_Management_Backend.Repository
                 var searchQuery = paginationParams.Search;
 
                 var query = @"
-        WITH CategoryCTE AS (
-            SELECT 
-                category_id_pkey AS CategoryID, 
-                category_name AS Name, 
-                category_description AS Description,
-                COUNT(*) OVER() AS CategoryCount
-            FROM category
-            WHERE (@SearchQuery IS NULL OR 
-                   category_name ILIKE '%' || @SearchQuery || '%' OR 
-                   category_description ILIKE '%' || @SearchQuery || '%')
-        )
-        SELECT *
-        FROM CategoryCTE
-        ORDER BY CategoryID
-        OFFSET @Offset ROWS
-        FETCH NEXT @PageSize ROWS ONLY;";
+            WITH CategoryCTE AS (
+                SELECT 
+                    category_id_pkey AS CategoryID, 
+                    category_name AS Name, 
+                    category_description AS Description,
+                    COUNT(*) OVER() AS TotalCount
+                FROM category
+                WHERE (@SearchQuery IS NULL OR 
+                       category_name ILIKE '%' || @SearchQuery || '%' OR 
+                       category_description ILIKE '%' || @SearchQuery || '%')
+            )
+            SELECT CategoryID, Name, Description, TotalCount
+            FROM CategoryCTE
+            ORDER BY CategoryID
+            OFFSET @Offset ROWS
+            FETCH NEXT @PageSize ROWS ONLY;";
 
                 var parameters = new
                 {
@@ -103,9 +103,17 @@ namespace Inventory_Management_Backend.Repository
                     SearchQuery = searchQuery
                 };
 
-                var categories = (await connection.QueryAsync<CategoryResponseDTO>(query, parameters)).ToList();
+                var result = await connection.QueryAsync<CategoryResponseDTO, long, (CategoryResponseDTO, long)>(
+                    query,
+                    (category, totalCount) => (category, totalCount),
+                    parameters,
+                    splitOn: "TotalCount"
+                );
 
-                return categories;
+                var categories = result.Select(r => r.Item1).ToList();
+                int totalCount = result.Any() ? (int)result.First().Item2 : 0;
+
+                return (categories, totalCount);
             }
         }
 

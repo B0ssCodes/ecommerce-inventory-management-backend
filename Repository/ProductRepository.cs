@@ -293,7 +293,7 @@ namespace Inventory_Management_Backend.Repository
         }
 
 
-        public async Task<List<AllProductResponseDTO>> GetProducts(PaginationParams paginationParams)
+        public async Task<(List<AllProductResponseDTO>, int)> GetProducts(PaginationParams paginationParams)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
@@ -302,30 +302,44 @@ namespace Inventory_Management_Backend.Repository
                 var offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
 
                 var query = @"
-        SELECT 
-            p.product_id_pkey AS ProductID, 
-            p.sku AS SKU, 
-            p.product_name AS Name, 
-            p.product_description AS Description, 
-            p.product_price AS Price, 
-            p.product_cost_price AS Cost, 
-            p.category_id AS CategoryID,
-            (SELECT COUNT(*) FROM image WHERE product_id = p.product_id_pkey) AS ImageCount,
-            (SELECT COUNT(*) FROM product) AS ProductCount
-        FROM product p
-        WHERE (@SearchQuery IS NULL OR p.product_name ILIKE '%' || @SearchQuery || '%' 
-               OR p.product_description ILIKE '%' || @SearchQuery || '%' 
-               OR p.sku ILIKE '%' || @SearchQuery || '%')
-        ORDER BY p.product_id_pkey
+        WITH ProductCTE AS (
+            SELECT 
+                p.product_id_pkey AS ProductID, 
+                p.sku AS SKU, 
+                p.product_name AS Name, 
+                p.product_description AS Description, 
+                p.product_price AS Price, 
+                p.product_cost_price AS Cost, 
+                p.category_id AS CategoryID,
+                (SELECT COUNT(*) FROM image WHERE product_id = p.product_id_pkey) AS ImageCount,
+                COUNT(*) OVER() AS TotalCount
+            FROM product p
+            WHERE (@SearchQuery IS NULL OR p.product_name ILIKE '%' || @SearchQuery || '%' 
+                   OR p.product_description ILIKE '%' || @SearchQuery || '%' 
+                   OR p.sku ILIKE '%' || @SearchQuery || '%')
+        )
+        SELECT ProductID, SKU, Name, Description, Price, Cost, CategoryID, ImageCount, TotalCount
+        FROM ProductCTE
+        ORDER BY ProductID
         OFFSET @Offset ROWS
         FETCH NEXT @PageSize ROWS ONLY;";
 
-                var products = (await connection.QueryAsync<AllProductResponseDTO>(query, new { Offset = offset, PageSize = paginationParams.PageSize, SearchQuery = paginationParams.Search })).ToList();
-
-                if (products == null)
+                var parameters = new
                 {
-                    return new List<AllProductResponseDTO>(); // Return an empty list if no products are found
-                }
+                    Offset = offset,
+                    PageSize = paginationParams.PageSize,
+                    SearchQuery = paginationParams.Search
+                };
+
+                var result = await connection.QueryAsync<AllProductResponseDTO, long, (AllProductResponseDTO, long)>(
+                    query,
+                    (product, totalCount) => (product, totalCount),
+                    parameters,
+                    splitOn: "TotalCount"
+                );
+
+                var products = result.Select(r => r.Item1).ToList();
+                int totalCount = result.Any() ? (int)result.First().Item2 : 0; // Explicitly cast to int
 
                 var fetchCategoryQuery = @"
         SELECT category_id_pkey AS CategoryID, category_name AS Name
@@ -345,9 +359,10 @@ namespace Inventory_Management_Backend.Repository
                     product.Category = category;
                 }
 
-                return products;
+                return (products, totalCount);
             }
         }
+
         public async Task<ProductResponseDTO> UpdateProduct(int productID, ProductRequestDTO productRequestDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())

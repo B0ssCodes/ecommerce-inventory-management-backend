@@ -26,11 +26,12 @@ namespace Inventory_Management_Backend.Controllers
         {
             try
             {
-                List<CategoryResponseDTO> response = await _categoryRepository.GetCategories(paginationParams);
+                var (categories, totalCount) = await _categoryRepository.GetCategories(paginationParams);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Categories retrieved successfully";
-                _response.Result = response;
+                _response.Result = categories;
+                _response.ItemCount = totalCount; // Include the total count in the response
                 return Ok(_response);
             }
             catch (Exception ex)
@@ -39,6 +40,7 @@ namespace Inventory_Management_Backend.Controllers
                 _response.IsSuccess = false;
                 _response.Message = ex.Message;
                 _response.Result = default;
+                _response.ItemCount = null; // Ensure ItemCount is null in case of an error
                 return BadRequest(_response);
             }
         }

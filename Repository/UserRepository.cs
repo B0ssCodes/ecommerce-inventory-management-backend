@@ -63,7 +63,7 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task<List<UserResponseDTO>> GetUsers(PaginationParams paginationParams)
+        public async Task<(List<UserResponseDTO>, int itemCount)> GetUsers(PaginationParams paginationParams)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
@@ -72,7 +72,7 @@ namespace Inventory_Management_Backend.Repository
                 var offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
                 var searchQuery = paginationParams.Search;
 
-                // CTE to get total count of users (recommended by copilot)
+                // CTE to get total count of users
                 var query = @"
         WITH UserCTE AS (
             SELECT 
@@ -89,7 +89,7 @@ namespace Inventory_Management_Backend.Repository
                    u.user_last_name ILIKE '%' || @SearchQuery || '%' OR 
                    u.user_email ILIKE '%' || @SearchQuery || '%')
         )
-        SELECT *
+        SELECT UserID, FirstName, LastName, Email, Role, UserCount
         FROM UserCTE
         ORDER BY FirstName
         OFFSET @Offset ROWS
@@ -102,9 +102,17 @@ namespace Inventory_Management_Backend.Repository
                     SearchQuery = searchQuery
                 };
 
-                var userDTOs = (await connection.QueryAsync<UserResponseDTO>(query, parameters)).ToList();
+                var result = await connection.QueryAsync<UserResponseDTO, long, (UserResponseDTO, long)>(
+                    query,
+                    (user, userCount) => (user, userCount),
+                    parameters,
+                    splitOn: "UserCount"
+                );
 
-                return userDTOs;
+                var users = result.Select(r => r.Item1).ToList();
+                int totalCount = result.Any() ? (int)result.First().Item2 : 0; // Explicitly cast to int
+
+                return (users, totalCount);
             }
         }
         // TODO: Implement UpdateUser method, no use for it now though

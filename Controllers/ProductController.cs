@@ -24,11 +24,12 @@ namespace Inventory_Management_Backend.Controllers
         {
             try
             {
-                List<AllProductResponseDTO> products = await _productRepository.GetProducts(paginationParams);
+                var(products, itemCount) = await _productRepository.GetProducts(paginationParams);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Products retrieved successfully";
                 _response.Result = products;
+                _response.ItemCount = itemCount;
                 return Ok(_response);
             }
             catch (Exception ex)

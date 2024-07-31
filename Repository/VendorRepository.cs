@@ -86,46 +86,57 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task<List<VendorResponseDTO>> GetVendors(PaginationParams paginationParams)
+        public async Task<(List<VendorResponseDTO>, int)> GetVendors(PaginationParams paginationParams)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
                 connection.Open();
 
-                
+                var offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
+                var searchQuery = paginationParams.Search;
+
                 var query = @"
-                WITH VendorCTE AS (
-                    SELECT 
-                        vendor_id_pkey AS VendorID, 
-                        vendor_name AS Name, 
-                        vendor_email AS Email,
-                        vendor_phone_number AS Phone, 
-                        vendor_commercial_phone AS CommercialPhone, 
-                        vendor_address AS Address,
-                        COUNT(*) OVER() AS VendorCount
-                    FROM vendor
-                    WHERE (@SearchQuery IS NULL OR 
-                           vendor_name ILIKE '%' || @SearchQuery || '%' OR 
-                           vendor_email ILIKE '%' || @SearchQuery || '%' OR 
-                           vendor_phone_number ILIKE '%' || @SearchQuery || '%' OR 
-                           vendor_commercial_phone ILIKE '%' || @SearchQuery || '%' OR 
-                           vendor_address ILIKE '%' || @SearchQuery || '%')
-                )
-                SELECT *
-                FROM VendorCTE
-                ORDER BY VendorID
-                OFFSET @Offset ROWS
-                FETCH NEXT @PageSize ROWS ONLY;";
+        WITH VendorCTE AS (
+            SELECT 
+                vendor_id_pkey AS VendorID, 
+                vendor_name AS Name, 
+                vendor_email AS Email,
+                vendor_phone_number AS Phone, 
+                vendor_commercial_phone AS CommercialPhone, 
+                vendor_address AS Address,
+                COUNT(*) OVER() AS VendorCount
+            FROM vendor
+            WHERE (@SearchQuery IS NULL OR 
+                   vendor_name ILIKE '%' || @SearchQuery || '%' OR 
+                   vendor_email ILIKE '%' || @SearchQuery || '%' OR 
+                   vendor_phone_number ILIKE '%' || @SearchQuery || '%' OR 
+                   vendor_commercial_phone ILIKE '%' || @SearchQuery || '%' OR 
+                   vendor_address ILIKE '%' || @SearchQuery || '%')
+        )
+        SELECT VendorID, Name, Email, Phone, CommercialPhone, Address, VendorCount
+        FROM VendorCTE
+        ORDER BY VendorID
+        OFFSET @Offset ROWS
+        FETCH NEXT @PageSize ROWS ONLY;";
 
                 var parameters = new
                 {
-                    SearchQuery = paginationParams.Search,
-                    Offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize,
+                    SearchQuery = searchQuery,
+                    Offset = offset,
                     PageSize = paginationParams.PageSize
                 };
 
-                List<VendorResponseDTO> vendors = (await connection.QueryAsync<VendorResponseDTO>(query, parameters)).ToList();
-                return vendors;
+                var result = await connection.QueryAsync<VendorResponseDTO, long, (VendorResponseDTO, long)>(
+                    query,
+                    (vendor, vendorCount) => (vendor, vendorCount),
+                    parameters,
+                    splitOn: "VendorCount"
+                );
+
+                var vendors = result.Select(r => r.Item1).ToList();
+                int totalCount = result.Any() ? (int)result.First().Item2 : 0; // Explicitly cast to int
+
+                return (vendors, totalCount);
             }
         }
 

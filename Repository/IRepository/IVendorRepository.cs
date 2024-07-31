@@ -5,7 +5,7 @@ namespace Inventory_Management_Backend.Repository.IRepository
 {
     public interface IVendorRepository
     {
-        public Task<List<VendorResponseDTO>> GetVendors(PaginationParams paginationParams);
+        public Task<(List<VendorResponseDTO>, int itemCount)> GetVendors(PaginationParams paginationParams);
         public Task<VendorResponseDTO> GetVendor(int vendorId);
         public Task CreateVendor(VendorRequestDTO vendorRequestDTO);
         public Task UpdateVendor(int vendorId, VendorRequestDTO vendorRequestDTO);

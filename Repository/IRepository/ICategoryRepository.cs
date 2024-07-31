@@ -5,7 +5,7 @@ namespace Inventory_Management_Backend.Repository.IRepository
 {
     public interface ICategoryRepository
     {
-        public Task<List<CategoryResponseDTO>> GetCategories(PaginationParams paginationParams);
+        public Task<(List<CategoryResponseDTO>, int ItemCount)> GetCategories(PaginationParams paginationParams);
         public Task<CategoryResponseDTO> GetCategory(int categoryID);
         public Task CreateCategory(CategoryRequestDTO requestDTO);
         public Task UpdateCategory(int categoryID, CategoryRequestDTO requestDTO);

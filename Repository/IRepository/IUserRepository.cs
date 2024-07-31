@@ -6,7 +6,7 @@ namespace Inventory_Management_Backend.Repository.IRepository
     public interface IUserRepository
     {
 
-        public Task<List<UserResponseDTO>> GetUsers(PaginationParams paginationParams);
+        public Task<(List<UserResponseDTO>, int itemCount)> GetUsers(PaginationParams paginationParams);
         public Task<UserResponseDTO> GetUser(int userID);
         //public Task UpdateUser (RegisterRequestDTO user);
         public Task DeleteUser(int userID);
