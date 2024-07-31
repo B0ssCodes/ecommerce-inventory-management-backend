@@ -95,7 +95,6 @@ namespace Inventory_Management_Backend.Repository
 
                     var transactionItemsQuery = @"
                 SELECT ti.transaction_item_id_pkey AS TransactionItemID,
-                       ti.transaction_id AS TransactionID,
                        ti.product_id AS ProductID,
                        ti.transaction_item_quantity AS Quantity,
                        ti.transaction_item_price AS Price,
