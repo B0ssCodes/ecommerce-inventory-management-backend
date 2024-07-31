@@ -55,14 +55,14 @@ namespace Inventory_Management_Backend.Repository
                 SELECT t.transaction_id_pkey AS TransactionID,
                        t.transaction_amount AS Amount,
                        t.transaction_date AS Date,
+                       tt.type AS TransactionType,
+                       ts.status AS TransactionStatus,
                        v.vendor_id_pkey AS VendorID,
                        v.vendor_name AS Name,
                        v.vendor_email AS Email,
                        v.vendor_phone_number AS Phone,
                        v.vendor_commercial_phone AS CommercialPhone,
-                       v.vendor_address AS Address,
-                       tt.type AS TransactionType,
-                       ts.status AS TransactionStatus
+                       v.vendor_address AS Address
                 FROM transaction t
                 JOIN vendor v ON t.vendor_id = v.vendor_id_pkey
                 JOIN transaction_type tt ON t.transaction_type_id = tt.transaction_type_id_pkey
@@ -100,7 +100,7 @@ namespace Inventory_Management_Backend.Repository
                        ti.transaction_item_quantity AS Quantity,
                        ti.transaction_item_price AS Price,
                        p.product_id_pkey AS ProductID,
-                       p.product_sku AS SKU,
+                       p.sku AS SKU,
                        p.product_name AS Name
                 FROM transaction_item ti
                 JOIN product p ON ti.product_id = p.product_id_pkey
@@ -127,55 +127,59 @@ namespace Inventory_Management_Backend.Repository
         }
 
 
-        public async Task<List<AllTransactionResponseDTO>> GetTransactions(PaginationParams paginationParams)
+        public async Task<(List<AllTransactionResponseDTO>, int)> GetTransactions(PaginationParams paginationParams)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
                 connection.Open();
 
-                using (var transactionScope = connection.BeginTransaction())
+                var transactionsQuery = @"
+        WITH TransactionCTE AS (
+            SELECT 
+                t.transaction_id_pkey AS TransactionID,
+                t.transaction_amount AS Amount,
+                t.transaction_date AS Date,
+                tt.type AS Type,
+                ts.status AS Status,
+                v.vendor_id_pkey AS VendorID,
+                v.vendor_name AS Name,
+                COUNT(*) OVER() AS TotalCount
+            FROM transaction t
+            JOIN vendor v ON t.vendor_id = v.vendor_id_pkey
+            JOIN transaction_type tt ON t.transaction_type_id = tt.transaction_type_id_pkey
+            JOIN transaction_status ts ON t.transaction_status_id = ts.transaction_status_id_pkey
+            WHERE (@Search IS NULL OR 
+                   t.transaction_amount::TEXT ILIKE '%' || @Search || '%' OR
+                   t.transaction_date::TEXT ILIKE '%' || @Search || '%' OR
+                   v.vendor_name ILIKE '%' || @Search || '%')
+        )
+        SELECT TransactionID, Amount, Date, Type, Status, VendorID, Name, TotalCount
+        FROM TransactionCTE
+        ORDER BY Date DESC
+        OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
+
+                var parameters = new
                 {
-                    var transactionsQuery = @"
-                SELECT t.transaction_id_pkey AS TransactionID,
-                       t.transaction_amount AS Amount,
-                       t.transaction_date AS Date,
-                       v.vendor_id_pkey AS VendorID,
-                       v.vendor_name AS Name,
-                       tt.type AS Type,
-                       ts.status AS Status
-                FROM transaction t
-                JOIN vendor v ON t.vendor_id = v.vendor_id_pkey
-                JOIN transaction_type tt ON t.transaction_type_id = tt.transaction_type_id_pkey
-                JOIN transaction_status ts ON t.transaction_status_id = ts.transaction_status_id_pkey
-                WHERE (@Search IS NULL OR 
-                       t.transaction_amount::TEXT ILIKE '%' || @Search || '%' OR
-                       t.transaction_date::TEXT ILIKE '%' || @Search || '%' OR
-                       v.vendor_name ILIKE '%' || @Search || '%')
-                ORDER BY t.transaction_date DESC
-                OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
+                    Offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize,
+                    PageSize = paginationParams.PageSize,
+                    Search = paginationParams.Search
+                };
 
-                    var parameters = new
+                var result = await connection.QueryAsync<AllTransactionResponseDTO, ShortVendorResponseDTO, long, (AllTransactionResponseDTO, long)>(
+                    transactionsQuery,
+                    (transaction, vendor, totalCount) =>
                     {
-                        Offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize,
-                        PageSize = paginationParams.PageSize,
-                        Search = paginationParams.Search
-                    };
+                        transaction.Vendor = vendor;
+                        return (transaction, totalCount);
+                    },
+                    parameters,
+                    splitOn: "VendorID, TotalCount"
+                );
 
-                    var transactions = await connection.QueryAsync<AllTransactionResponseDTO, ShortVendorResponseDTO, AllTransactionResponseDTO>(
-                        transactionsQuery,
-                        (transaction, vendor) =>
-                        {
-                            transaction.Vendor = vendor;
-                            return transaction;
-                        },
-                        parameters,
-                        transactionScope,
-                        splitOn: "VendorID"
-                    );
+                var transactions = result.Select(r => r.Item1).ToList();
+                int totalCount = result.Any() ? (int)result.First().Item2 : 0; // Explicitly cast to int
 
-                    transactionScope.Commit();
-                    return transactions.ToList();
-                }
+                return (transactions, totalCount);
             }
         }
 
@@ -203,7 +207,7 @@ namespace Inventory_Management_Backend.Repository
                         throw new Exception("Transaction does not exist");
                     }
 
-                    // 1 corresponds to the "Created" status
+                    // 1 corresponds to the "created" status
                     if (transactionStatus != 1)
                     {
                         throw new Exception("Transaction already submitted");
@@ -237,7 +241,7 @@ namespace Inventory_Management_Backend.Repository
                     var transactionUpdateParameters = new
                     {
                         Amount = transactionDTO.Amount,
-                        Date = transactionDTO.Date,
+                        Date = DateTime.UtcNow,
                         TransactionID = transactionDTO.TransactionID
                     };
 
