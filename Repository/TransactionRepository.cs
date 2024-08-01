@@ -191,9 +191,9 @@ namespace Inventory_Management_Backend.Repository
                 using (var transactionScope = connection.BeginTransaction())
                 {
                     var transactionCheckQuery = @"
-                SELECT transaction_status_id
-                FROM transaction
-                WHERE transaction_id_pkey = @TransactionID";
+                    SELECT transaction_status_id
+                    FROM transaction
+                    WHERE transaction_id_pkey = @TransactionID";
 
                     var transactionCheckParameters = new
                     {
@@ -213,8 +213,8 @@ namespace Inventory_Management_Backend.Repository
                     }
 
                     var transactionItemsQuery = @"
-                INSERT INTO transaction_item (product_id, transaction_item_quantity, transaction_item_price, transaction_id)
-                VALUES (@ProductID, @Quantity, @Price, @TransactionID);";
+                    INSERT INTO transaction_item (product_id, transaction_item_quantity, transaction_item_price, transaction_id)
+                    VALUES (@ProductID, @Quantity, @Price, @TransactionID);";
 
                     foreach (var item in transactionDTO.TransactionItems)
                     {
@@ -231,11 +231,11 @@ namespace Inventory_Management_Backend.Repository
                     }
 
                     var transactionUpdateQuery = @"
-                UPDATE transaction
-                SET transaction_status_id = 2,
-                    transaction_amount = @Amount,
-                    transaction_date = @Date
-                WHERE transaction_id_pkey = @TransactionID;";
+                        UPDATE transaction
+                        SET transaction_status_id = 2,
+                            transaction_amount = @Amount,
+                            transaction_date = @Date
+                        WHERE transaction_id_pkey = @TransactionID;";
 
                     var transactionUpdateParameters = new
                     {

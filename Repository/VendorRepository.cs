@@ -115,7 +115,7 @@ namespace Inventory_Management_Backend.Repository
         )
         SELECT VendorID, Name, Email, Phone, CommercialPhone, Address, VendorCount
         FROM VendorCTE
-        ORDER BY VendorID
+        ORDER BY VendorID DESC
         OFFSET @Offset ROWS
         FETCH NEXT @PageSize ROWS ONLY;";
 

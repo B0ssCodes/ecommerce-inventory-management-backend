@@ -1,6 +1,7 @@
 ﻿using Inventory_Management_Backend.Models;
 using Inventory_Management_Backend.Models.Dto;
 using Inventory_Management_Backend.Repository.IRepository;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
@@ -21,6 +22,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPost]
+        [Authorize]
         [Route("get")]
         public async Task<IActionResult> GetVendors(PaginationParams paginationParams)
         {
@@ -45,6 +47,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpGet]
+        [Authorize]
         [Route("get/{vendorID}")]
         public async Task<IActionResult> GetVendor(int vendorID)
         {
@@ -68,6 +71,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPost]
+        [Authorize]
         [Route("create")]
         public async Task<IActionResult> CreateVendor(VendorRequestDTO vendorRequestDTO)
         {
@@ -91,6 +95,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPut]
+        [Authorize]
         [Route("update/{vendorID}")]
         public async Task<IActionResult> UpdateVendor(int vendorID, VendorRequestDTO vendorRequestDTO)
         {
@@ -114,6 +119,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpDelete]
+        [Authorize]
         [Route("delete/{vendorID}")]
         public async Task<IActionResult> DeleteVendor(int vendorID)
         {

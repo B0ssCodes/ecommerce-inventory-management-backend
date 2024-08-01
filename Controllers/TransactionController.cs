@@ -1,6 +1,7 @@
 ﻿using Inventory_Management_Backend.Models;
 using Inventory_Management_Backend.Models.Dto;
 using Inventory_Management_Backend.Repository.IRepository;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
@@ -21,6 +22,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPost]
+        [Authorize]
         [Route("get")]
         public async Task<IActionResult> GetTransactions(PaginationParams paginationParams)
         {
@@ -49,6 +51,7 @@ namespace Inventory_Management_Backend.Controllers
 
       
         [HttpGet]
+        [Authorize]
         [Route("get/{transactionID}")]
         public async Task<IActionResult> GetTransaction(int transactionID)
         {
@@ -72,6 +75,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPost]
+        [Authorize]
         [Route("create")]
         public async Task<IActionResult> CreateTransaction(TransactionCreateDTO createDTO)
         {
@@ -95,6 +99,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPost]
+        [Authorize]
         [Route("submit")]
         public async Task<IActionResult> SubmitTransaction(TransactionSubmitDTO submitDTO)
         {

@@ -1,6 +1,7 @@
 ﻿using Inventory_Management_Backend.Models;
 using Inventory_Management_Backend.Models.Dto;
 using Inventory_Management_Backend.Repository.IRepository;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
@@ -21,6 +22,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpGet]
+        [Authorize]
         [Route("getUserRoles")]
         public async Task<IActionResult> GetUserRoles()
         {
@@ -45,6 +47,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpGet]
+        [Authorize]
         [Route("getUserRole/{userRoleId}")]
         public async Task<IActionResult> GetUserRole(int userRoleId)
         {
@@ -69,6 +72,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPost]
+        [Authorize]
         [Route("createUserRole")]
         public async Task<IActionResult> CreateUserRole(string roleName)
         {
@@ -93,6 +97,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPut]
+        [Authorize]
         [Route("updateUserRole/{roleId}")]
         public async Task<IActionResult> UpdateUserRole(int roleId, string roleName)
         {
@@ -117,6 +122,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpDelete]
+        [Authorize]
         [Route("deleteUserRole/{roleId}")]
         public async Task<IActionResult> DeleteUserRole(int roleId)
         {

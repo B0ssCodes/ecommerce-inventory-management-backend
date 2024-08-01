@@ -320,7 +320,7 @@ namespace Inventory_Management_Backend.Repository
         )
         SELECT ProductID, SKU, Name, Description, Price, Cost, CategoryID, ImageCount, TotalCount
         FROM ProductCTE
-        ORDER BY ProductID
+        ORDER BY ProductID DESC
         OFFSET @Offset ROWS
         FETCH NEXT @PageSize ROWS ONLY;";
 

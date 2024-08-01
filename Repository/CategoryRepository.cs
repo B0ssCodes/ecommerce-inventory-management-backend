@@ -92,7 +92,7 @@ namespace Inventory_Management_Backend.Repository
             )
             SELECT CategoryID, Name, Description, TotalCount
             FROM CategoryCTE
-            ORDER BY CategoryID
+            ORDER BY CategoryID DESC
             OFFSET @Offset ROWS
             FETCH NEXT @PageSize ROWS ONLY;";
 

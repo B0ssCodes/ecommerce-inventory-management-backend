@@ -1,11 +1,13 @@
 ﻿using Inventory_Management_Backend.Models;
 using Inventory_Management_Backend.Models.Dto;
 using Inventory_Management_Backend.Repository.IRepository;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 namespace Inventory_Management_Backend.Controllers
 {
     [Route("api/product")]
+    [Authorize]
     [ApiController]
     public class ProductController : ControllerBase
     {
@@ -19,6 +21,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPost]
+        [Authorize]
         [Route("get")]
         public async Task<IActionResult> GetProducts(PaginationParams paginationParams)
         {
@@ -43,6 +46,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpGet]
+        [Authorize]
         [Route("get/{productID}")]
         public async Task<IActionResult> GetProduct(int productID)
         {
@@ -74,6 +78,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPost]
+        [Authorize]
         [Route("create")]
         // Setup the create as form data to receive the images
         [Consumes("multipart/form-data")]
@@ -99,6 +104,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpDelete]
+        [Authorize]
         [Route("delete/{productID}")]
         public async Task<IActionResult> DeleteProduct(int productID)
         {
@@ -122,6 +128,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPut]
+        [Authorize]
         [Route("update/{productID}")]
         // Setup the update as form data to receive the images
         [Consumes("multipart/form-data")]

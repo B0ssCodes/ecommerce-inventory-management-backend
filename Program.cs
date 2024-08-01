@@ -14,7 +14,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(options => {
+builder.Services.AddSwaggerGen(options =>
+{
     options.MapType<DateOnly>(() => new OpenApiSchema
     {
         Type = "string",
@@ -86,10 +87,10 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 // Major error was applying cors after static files, always apply before
-app.UseCors("AllowAll"); 
+app.UseCors("AllowAll");
 
 // Enable serving static files to get images in frontend
-app.UseStaticFiles(); 
+app.UseStaticFiles();
 
 // Get the images directory from appsettings.json
 var imagesDirectory = builder.Configuration["ImagesDirectory"];

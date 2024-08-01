@@ -1,6 +1,7 @@
 ﻿using Inventory_Management_Backend.Models;
 using Inventory_Management_Backend.Models.Dto;
 using Inventory_Management_Backend.Repository.IRepository;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
@@ -21,6 +22,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPost]
+        [Authorize]
         [Route("get")]
         public async Task<IActionResult> GetUsers(PaginationParams paginationParams)
         {
@@ -47,6 +49,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpGet]
+        [Authorize]
         [Route("get/{userID}")]
         public async Task<IActionResult> GetUser(int userID)
         {
@@ -70,6 +73,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpDelete]
+        [Authorize]
         [Route("delete/{userID}")]
         public async Task<IActionResult> DeleteUser(int userID)
         {
