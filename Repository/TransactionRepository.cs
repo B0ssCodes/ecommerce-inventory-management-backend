@@ -150,6 +150,8 @@ namespace Inventory_Management_Backend.Repository
             WHERE (@Search IS NULL OR 
                    t.transaction_amount::TEXT ILIKE '%' || @Search || '%' OR
                    t.transaction_date::TEXT ILIKE '%' || @Search || '%' OR
+                   tt.type ILIKE '%' || @Search || '%' OR
+                   ts.status ILIKE '%' || @Search || '%' OR
                    v.vendor_name ILIKE '%' || @Search || '%')
         )
         SELECT TransactionID, Amount, Date, Type, Status, VendorID, Name, TotalCount
@@ -176,7 +178,7 @@ namespace Inventory_Management_Backend.Repository
                 );
 
                 var transactions = result.Select(r => r.Item1).ToList();
-                int totalCount = result.Any() ? (int)result.First().Item2 : 0; // Explicitly cast to int
+                int totalCount = result.Any() ? (int)result.First().Item2 : 0; // Explicitly cast to int, had an int64 error before
 
                 return (transactions, totalCount);
             }

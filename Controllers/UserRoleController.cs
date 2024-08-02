@@ -13,136 +13,132 @@ namespace Inventory_Management_Backend.Controllers
     public class UserRoleController : ControllerBase 
     {
         private readonly IUserRoleRepository _userRoleRepository;
-        private readonly ApiResponse _apiResponse;
+        private readonly ApiResponse _response;
 
         public UserRoleController(IUserRoleRepository userRoleRepository, ApiResponse apiResponse)
         {
             _userRoleRepository = userRoleRepository;
-            _apiResponse = apiResponse;
+            _response = apiResponse;
         }
 
-        [HttpGet]
-        [Authorize]
-        [Route("getUserRoles")]
-        public async Task<IActionResult> GetUserRoles()
+        [HttpPost]
+        [Route("get")]
+        public async Task<IActionResult> GetUserRoles(PaginationParams paginationParams)
         {
             try
             {
-                List<UserRoleDTO> userRoles = await _userRoleRepository.GetUserRoles();
-                _apiResponse.StatusCode = HttpStatusCode.OK;
-                _apiResponse.IsSuccess = true;
-                _apiResponse.Message = "User roles retrieved successfully";
-                _apiResponse.Result = userRoles;
-                return Ok(_apiResponse);
+                var (userRoles, totalCount) = await _userRoleRepository.GetUserRoles(paginationParams);
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "User roles retrieved successfully";
+                _response.Result = userRoles;
+                _response.ItemCount = totalCount;
+                return Ok(_response);
             }
             
             catch (Exception Ex)
             {
-                _apiResponse.StatusCode = HttpStatusCode.BadRequest;
-                _apiResponse.IsSuccess = false;
-                _apiResponse.Message = Ex.Message;
-                _apiResponse.Result = null;
-                return BadRequest(_apiResponse);
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.Message = Ex.Message;
+                _response.Result = null;
+                return BadRequest(_response);
             }
         }
 
         [HttpGet]
-        [Authorize]
-        [Route("getUserRole/{userRoleId}")]
+        [Route("get/{userRoleId}")]
         public async Task<IActionResult> GetUserRole(int userRoleId)
         {
             try
             {
                 UserRoleDTO userRole = await _userRoleRepository.GetUserRole(userRoleId);
-                _apiResponse.StatusCode = HttpStatusCode.OK;
-                _apiResponse.IsSuccess = true;
-                _apiResponse.Message = "User role retrieved successfully";
-                _apiResponse.Result = userRole;
-                return Ok(_apiResponse);
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "User role retrieved successfully";
+                _response.Result = userRole;
+                return Ok(_response);
             }
             
             catch (Exception Ex)
             {
-                _apiResponse.StatusCode = HttpStatusCode.BadRequest;
-                _apiResponse.IsSuccess = false;
-                _apiResponse.Message = Ex.Message;
-                _apiResponse.Result = null;
-                return BadRequest(_apiResponse);
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.Message = Ex.Message;
+                _response.Result = null;
+                return BadRequest(_response);
             }
         }
 
         [HttpPost]
-        [Authorize]
-        [Route("createUserRole")]
-        public async Task<IActionResult> CreateUserRole(string roleName)
+        [Route("create")]
+        public async Task<IActionResult> CreateUserRole(UserRoleRequestDTO requestDTO)
         {
             try
             {
-                UserRoleDTO userRole = await _userRoleRepository.CreateUserRole(roleName);
-                _apiResponse.StatusCode = HttpStatusCode.OK;
-                _apiResponse.IsSuccess = true;
-                _apiResponse.Message = "User role created successfully";
-                _apiResponse.Result = userRole;
-                return Ok(_apiResponse);
+                UserRoleDTO userRole = await _userRoleRepository.CreateUserRole(requestDTO);
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "User role created successfully";
+                _response.Result = userRole;
+                return Ok(_response);
             }
             
             catch (Exception Ex)
             {
-                _apiResponse.StatusCode = HttpStatusCode.BadRequest;
-                _apiResponse.IsSuccess = false;
-                _apiResponse.Message = Ex.Message;
-                _apiResponse.Result = null;
-                return BadRequest(_apiResponse);
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.Message = Ex.Message;
+                _response.Result = null;
+                return BadRequest(_response);
             }
         }
 
         [HttpPut]
-        [Authorize]
-        [Route("updateUserRole/{roleId}")]
-        public async Task<IActionResult> UpdateUserRole(int roleId, string roleName)
+        [Route("update/{roleId}")]
+        public async Task<IActionResult> UpdateUserRole(int roleId, UserRoleRequestDTO requestDTO)
         {
             try
             {
-                UserRoleDTO userRole = await _userRoleRepository.UpdateUserRole(roleId, roleName);
-                _apiResponse.StatusCode = HttpStatusCode.OK;
-                _apiResponse.IsSuccess = true;
-                _apiResponse.Message = "User role updated successfully";
-                _apiResponse.Result = userRole;
-                return Ok(_apiResponse);
+                UserRoleDTO userRole = await _userRoleRepository.UpdateUserRole(roleId, requestDTO);
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "User role updated successfully";
+                _response.Result = userRole;
+                return Ok(_response);
             }
             
             catch (Exception Ex)
             {
-                _apiResponse.StatusCode = HttpStatusCode.BadRequest;
-                _apiResponse.IsSuccess = false;
-                _apiResponse.Message = Ex.Message;
-                _apiResponse.Result = null;
-                return BadRequest(_apiResponse);
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.Message = Ex.Message;
+                _response.Result = null;
+                return BadRequest(_response);
             }
         }
 
         [HttpDelete]
-        [Authorize]
-        [Route("deleteUserRole/{roleId}")]
+        [Route("delete/{roleId}")]
         public async Task<IActionResult> DeleteUserRole(int roleId)
         {
             try
             {
                 await _userRoleRepository.DeleteUserRole(roleId);
-                _apiResponse.StatusCode = HttpStatusCode.OK;
-                _apiResponse.IsSuccess = true;
-                _apiResponse.Message = "User role deleted successfully";
-                _apiResponse.Result = null;
-                return Ok(_apiResponse);
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "User role deleted successfully";
+                _response.Result = null;
+                return Ok(_response);
             }
             
             catch (Exception Ex)
             {
-                _apiResponse.StatusCode = HttpStatusCode.BadRequest;
-                _apiResponse.IsSuccess = false;
-                _apiResponse.Message = Ex.Message;
-                _apiResponse.Result = null;
-                return BadRequest(_apiResponse);
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.Message = Ex.Message;
+                _response.Result = null;
+                return BadRequest(_response);
             }
         }
 

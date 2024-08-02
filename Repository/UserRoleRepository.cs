@@ -16,7 +16,7 @@ namespace Inventory_Management_Backend.Repository
             _db = db;
         }
 
-        public async Task<UserRoleDTO> CreateUserRole(string roleName)
+        public async Task<UserRoleDTO> CreateUserRole(UserRoleRequestDTO requestDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
@@ -25,7 +25,7 @@ namespace Inventory_Management_Backend.Repository
             VALUES (@Name)
             RETURNING user_role_id_pkey AS UserRoleID, role AS Role";
 
-                var parameters = new { Name = roleName };
+                var parameters = new { Name = requestDTO.RoleName };
                 UserRoleDTO userDTO = await connection.QueryFirstOrDefaultAsync<UserRoleDTO>(query, parameters);
 
                 if (userDTO == null)
@@ -41,10 +41,34 @@ namespace Inventory_Management_Backend.Repository
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
-                var query = "DELETE FROM user_role WHERE user_role_id_pkey = @Id";
+                connection.Open();
+                using (var transaction = connection.BeginTransaction())
+                {
+                    try
+                    {
 
-                var parameters = new { Id = roleId };
-                await connection.ExecuteAsync(query, parameters);
+                        var deleteUserQuery = @"
+                        DELETE FROM user_info
+                        WHERE user_role_id = @RoleID;";
+
+                        var deleteUserParameters = new { RoleID = roleId };
+                        await connection.ExecuteAsync(deleteUserQuery, deleteUserParameters, transaction);
+
+                        var deleteUserRoleQuery = @"
+                            DELETE FROM user_role 
+                            WHERE user_role_id_pkey = @RoleID";
+
+                        var deleteUserRoleParameters = new { RoleID = roleId };
+                        await connection.ExecuteAsync(deleteUserRoleQuery, deleteUserRoleParameters, transaction);
+
+                        transaction.Commit();
+                    }
+                    catch(Exception ex)
+                    {
+                        transaction.Rollback();
+                    }
+                }
+                    
             }
         }
 
@@ -68,24 +92,55 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task<List<UserRoleDTO>> GetUserRoles()
+        public async Task<(List<UserRoleDTO>, int)> GetUserRoles(PaginationParams paginationParams)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
                 var query = @"
-            SELECT user_role_id_pkey AS UserRoleID, role AS Role
-            FROM user_role";
+            WITH UserRoleCTE AS (
+                SELECT 
+                    user_role_id_pkey AS UserRoleID, 
+                    role AS Role,
+                    COUNT(*) OVER() AS TotalCount
+                FROM user_role
+                WHERE @Search IS NULL OR role ILIKE '%' || @Search || '%'
+            )
+            SELECT 
+                UserRoleID, 
+                Role, 
+                TotalCount
+            FROM UserRoleCTE
+            ORDER BY Role
+            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
 
-                IEnumerable<UserRoleDTO> userRoles = await connection.QueryAsync<UserRoleDTO>(query);
+                var parameters = new
+                {
+                    Search = paginationParams.Search,
+                    Offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize,
+                    PageSize = paginationParams.PageSize
+                };
+
+                var userRoles = await connection.QueryAsync<UserRoleDTO, long, (UserRoleDTO, long)>(query,
+                    (userRole, totalCount) =>
+                    {
+                        return (userRole, totalCount);
+                    },
+                    parameters,
+                    splitOn: "TotalCount");
+
                 if (userRoles == null)
                 {
                     throw new Exception("No user roles found");
                 }
-                return userRoles.ToList();
+
+                List<UserRoleDTO> userRoleList = userRoles.Select(x => x.Item1).ToList();
+                int totalItems = (int)userRoles.Select(x => x.Item2).FirstOrDefault();
+
+                return (userRoleList, totalItems);
             }
         }
 
-        public async Task<UserRoleDTO> UpdateUserRole(int roleId, string roleName)
+        public async Task<UserRoleDTO> UpdateUserRole(int roleId, UserRoleRequestDTO requestDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
@@ -95,7 +150,7 @@ namespace Inventory_Management_Backend.Repository
                     WHERE user_role_id_pkey = @Id
                     RETURNING user_role_id_pkey as UserRoleID, role AS Role";
 
-                var parameters = new { RoleName = roleName, Id = roleId };
+                var parameters = new { RoleName = requestDTO.RoleName, Id = roleId };
                 UserRoleDTO updatedUserRole = await connection.QueryFirstOrDefaultAsync<UserRoleDTO>(query, parameters);
 
                 if (updatedUserRole == null)
