@@ -201,6 +201,14 @@ namespace Inventory_Management_Backend.Repository
 
                         await connection.ExecuteAsync(deleteImagesQuery, new { ProductID = productID }, transaction);
 
+                        var deleteTransactionItemsQuery = @"
+                            DELETE FROM transaction_item
+                            WHERE product_id = @ProductID;";
+
+                        var parameters = new { ProductID = productID };
+
+                        await connection.ExecuteAsync(deleteTransactionItemsQuery, parameters, transaction);
+
                         // Delete the product
                         var deleteProductQuery = @"
                 DELETE FROM product
@@ -261,10 +269,10 @@ namespace Inventory_Management_Backend.Repository
 
                 if (product == null)
                 {
-                    return null; // Or handle the case where the product is not found
+                    throw new Exception("Product not found");
                 }
 
-                // Fetch the images related to the product and serve them as static files
+                // Fetch the images related to the product
                 var fetchImagesQuery = @"
         SELECT image_id_pkey AS ImageID, image_url AS Url
         FROM image

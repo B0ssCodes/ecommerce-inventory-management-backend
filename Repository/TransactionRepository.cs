@@ -7,13 +7,15 @@ using System.Data;
 
 namespace Inventory_Management_Backend.Repository
 {
-    public class TransactionRepository: ITransactionRepository
+    public class TransactionRepository : ITransactionRepository
     {
         private readonly DapperContext _db;
+        private readonly IInventoryRepository _inventoryRepository;
 
-        public TransactionRepository(DapperContext db)
+        public TransactionRepository(DapperContext db, IInventoryRepository inventoryRepository)
         {
             _db = db;
+            _inventoryRepository = inventoryRepository;
         }
 
         public async Task<int> CreateTransaction(TransactionCreateDTO createDTO)
@@ -192,63 +194,116 @@ namespace Inventory_Management_Backend.Repository
 
                 using (var transactionScope = connection.BeginTransaction())
                 {
-                    var transactionCheckQuery = @"
-                    SELECT transaction_status_id
+                    try
+                    {
+
+
+                        var transactionCheckQuery = @"
+                    SELECT transaction_status_id AS TransactionStatusID, transaction_type_id AS TransactionTypeID
                     FROM transaction
                     WHERE transaction_id_pkey = @TransactionID";
 
-                    var transactionCheckParameters = new
-                    {
-                        TransactionID = transactionDTO.TransactionID
-                    };
-
-                    int transactionStatus = await connection.QueryFirstOrDefaultAsync<int>(transactionCheckQuery, transactionCheckParameters, transactionScope);
-                    if (transactionStatus == 0)
-                    {
-                        throw new Exception("Transaction does not exist");
-                    }
-
-                    // 1 corresponds to the "created" status
-                    if (transactionStatus != 1)
-                    {
-                        throw new Exception("Transaction already submitted");
-                    }
-
-                    var transactionItemsQuery = @"
-                    INSERT INTO transaction_item (product_id, transaction_item_quantity, transaction_item_price, transaction_id)
-                    VALUES (@ProductID, @Quantity, @Price, @TransactionID);";
-
-                    foreach (var item in transactionDTO.TransactionItems)
-                    {
-                        var parameters = new
+                        var transactionCheckParameters = new
                         {
-                            ProductID = item.ProductID,
-                            Quantity = item.Quantity,
-                            Price = item.Price,
                             TransactionID = transactionDTO.TransactionID
                         };
 
-                        // The product items are now added in db
-                        await connection.ExecuteAsync(transactionItemsQuery, parameters, transactionScope);
-                    }
+                        TransactionTypeStatusDTO transactionTypeStatus = await connection.QueryFirstOrDefaultAsync<TransactionTypeStatusDTO>(transactionCheckQuery, transactionCheckParameters, transactionScope);
+                        if (transactionTypeStatus.TransactionStatusID == 0)
+                        {
+                            throw new Exception("Transaction does not exist");
+                        }
 
-                    var transactionUpdateQuery = @"
+                        // 1 corresponds to the "created" status
+                        if (transactionTypeStatus.TransactionStatusID != 1)
+                        {
+                            throw new Exception("Transaction already submitted");
+                        }
+
+                        var transactionItemsQuery = @"
+                    INSERT INTO transaction_item (product_id, transaction_item_quantity, transaction_item_price, transaction_id)
+                    VALUES (@ProductID, @Quantity, @Price, @TransactionID);";
+
+                        foreach (var item in transactionDTO.TransactionItems)
+                        {
+                            var parameters = new
+                            {
+                                ProductID = item.ProductID,
+                                Quantity = item.Quantity,
+                                Price = item.Price,
+                                TransactionID = transactionDTO.TransactionID
+                            };
+
+                            // The product items are now added in db
+                            await connection.ExecuteAsync(transactionItemsQuery, parameters, transactionScope);
+
+                            // Update the inventory
+                            // Check the transaction type
+                            int transactionTypeID = transactionTypeStatus.TransactionTypeID;
+
+                            // Check if there already is an inventory for the product
+                            int inventoryID = await _inventoryRepository.InventoryExists(item.ProductID);
+
+                            // If there is:
+                            // If the type is Inbound, call the AddInventory method and pass the item.
+                            // If the type is Outbound, call the DecreaseInventory method and pass the item.
+                            if (inventoryID > 0)
+                            {
+                                // If inbound
+                                if (transactionTypeID == 1)
+                                {
+                                    await _inventoryRepository.IncreaseInventory(inventoryID, item);
+                                }
+                                else if (transactionTypeID == 2)
+                                {
+                                    await _inventoryRepository.DecreaseInventory(inventoryID, item);
+                                }
+                                else
+                                {
+                                    throw new Exception("Invalid transaction type");
+                                }
+                            }
+
+                            // If there isn't.
+                            // if the type is Inbound, call the CreateInventory method and pass the item.
+                            // If the type is Outbound, throw an exception.
+                            if (inventoryID == 0)
+                            {
+                                if (transactionTypeID == 1)
+                                {
+                                    await _inventoryRepository.CreateInventory(item);
+                                }
+                                else if (transactionTypeID == 2)
+                                {
+                                    throw new Exception("Inventory does not exist");
+                                }
+                            }
+
+                        }
+
+                        var transactionUpdateQuery = @"
                         UPDATE transaction
                         SET transaction_status_id = 2,
                             transaction_amount = @Amount,
                             transaction_date = @Date
                         WHERE transaction_id_pkey = @TransactionID;";
 
-                    var transactionUpdateParameters = new
+                        var transactionUpdateParameters = new
+                        {
+                            Amount = transactionDTO.Amount,
+                            Date = DateTime.UtcNow,
+                            TransactionID = transactionDTO.TransactionID
+                        };
+
+                        await connection.ExecuteAsync(transactionUpdateQuery, transactionUpdateParameters, transactionScope);
+
+                        transactionScope.Commit();
+                    }
+                    catch (Exception ex)
                     {
-                        Amount = transactionDTO.Amount,
-                        Date = DateTime.UtcNow,
-                        TransactionID = transactionDTO.TransactionID
-                    };
-
-                    await connection.ExecuteAsync(transactionUpdateQuery, transactionUpdateParameters, transactionScope);
-
-                    transactionScope.Commit();
+                        transactionScope.Rollback();
+                        throw ex;
+                    }
                 }
             }
         }
