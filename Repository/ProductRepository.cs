@@ -209,6 +209,14 @@ namespace Inventory_Management_Backend.Repository
 
                         await connection.ExecuteAsync(deleteTransactionItemsQuery, parameters, transaction);
 
+                        var deleteInventoryQuery = @"
+                            DELETE FROM inventory
+                            WHERE product_id = @ProductID;";
+
+                        var inventoryParameters = new { ProductID = productID };
+
+                        await connection.ExecuteAsync(deleteInventoryQuery, inventoryParameters, transaction);
+
                         // Delete the product
                         var deleteProductQuery = @"
                 DELETE FROM product

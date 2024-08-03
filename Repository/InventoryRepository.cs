@@ -142,6 +142,7 @@ namespace Inventory_Management_Backend.Repository
                            i.inventory_cost AS Price,
                            p.product_name AS ProductName,
                            p.sku AS ProductSKU,
+                           p.product_cost_price AS ProductPrice,
                            COUNT (*) OVER() AS TotalCount
                     FROM inventory i
                     JOIN product p ON i.product_id = p.product_id_pkey
@@ -149,7 +150,7 @@ namespace Inventory_Management_Backend.Repository
                             OR p.sku ILIKE '%' || @SearchQuery || '%'
                             OR CAST(i.inventory_stock AS TEXT) ILIKE '%' || @SearchQuery || '%')
                     )
-                    SELECT InventoryID, Quantity, Price, ProductName, ProductSKU, TotalCount
+                    SELECT InventoryID, Quantity, Price, ProductName, ProductSKU, ProductPrice, TotalCount
                     FROM InventoryCTE
                     ORDER BY InventoryID DESC
                     OFFSET @Offset ROWS
