@@ -22,7 +22,7 @@ namespace Inventory_Management_Backend.Repository
                 connection.Open();
                 var query = @"
                     UPDATE inventory
-                    SET inventory_stock = inventory_stock + @Quantity
+                    SET inventory_stock = inventory_stock + @Quantity,
                         inventory_cost = inventory_cost + @Price
                     WHERE inventory_id_pkey = @InventoryID;";
 
@@ -94,12 +94,14 @@ namespace Inventory_Management_Backend.Repository
                     {
                         var query = @"
                             UPDATE inventory
-                            SET inventory_stock = inventory_stock - @Quantity
+                            SET inventory_stock = inventory_stock - @Quantity,
+                             inventory_cost = inventory_cost - @Price
                             WHERE inventory_id_pkey = @InventoryID;";
 
                         var parameters = new
                         {
                             Quantity = requestDTO.Quantity,
+                            Price = requestDTO.Price,
                             InventoryID = inventoryID,
                         };
 

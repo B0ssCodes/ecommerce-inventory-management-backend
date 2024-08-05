@@ -7,7 +7,6 @@ using System.Net;
 namespace Inventory_Management_Backend.Controllers
 {
     [Route("api/product")]
-    [Authorize]
     [ApiController]
     public class ProductController : ControllerBase
     {
@@ -21,7 +20,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPost]
-        [Authorize]
+        //[Authorize]
         [Route("get")]
         public async Task<IActionResult> GetProducts(PaginationParams paginationParams)
         {
@@ -130,7 +129,7 @@ namespace Inventory_Management_Backend.Controllers
         [HttpPut]
         [Authorize]
         [Route("update/{productID}")]
-        // Setup the update as form data to receive the images
+        // Setup the update as form data to receive the images as IFormFile
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> UpdateProduct(int productID, [FromForm] ProductRequestDTO productDTO)
         {

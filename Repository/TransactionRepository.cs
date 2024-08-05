@@ -46,6 +46,39 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
+        public async Task DeleteTransaction(int transactionID)
+        {
+            using (IDbConnection connection = _db.CreateConnection())
+            {
+                connection.Open();
+
+                var transactionStatusQuery = @"
+                    SELECT transaction_status_id AS TransactionStatusID
+                    FROM transaction
+                    WHERE transaction_id_pkey = @TransactionID;";
+
+                var transactionStatusParameters = new { TransactionID = transactionID };
+
+                int transactionStatus = await connection.QueryFirstOrDefaultAsync<int>(transactionStatusQuery, transactionStatusParameters);
+                if (transactionStatus == 0)
+                {
+                    throw new Exception("Transaction does not exist");
+                }
+
+                if (transactionStatus != 1)
+                {
+                    throw new Exception("Transaction cannot be deleted");
+                }
+
+                var transactionDeleteQuery = @"
+                    DELETE FROM transaction
+                    WHERE transaction_id_pkey = @TransactionID;";
+
+                await connection.ExecuteAsync(transactionDeleteQuery, transactionStatusParameters);
+                
+            }
+        }
+
         public async Task<TransactionResponseDTO> GetTransaction(int transactionID)
         {
             using (IDbConnection connection = _db.CreateConnection())

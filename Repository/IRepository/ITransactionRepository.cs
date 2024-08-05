@@ -9,5 +9,6 @@ namespace Inventory_Management_Backend.Repository.IRepository
         public Task<TransactionResponseDTO> GetTransaction(int transactionID);
         public Task<int> CreateTransaction(TransactionCreateDTO createDTO);
         public Task SubmitTransaction(TransactionSubmitDTO transactionDTO);
+        public Task DeleteTransaction(int transactionID);
     }
 }

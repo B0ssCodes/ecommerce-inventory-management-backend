@@ -121,6 +121,29 @@ namespace Inventory_Management_Backend.Controllers
             }
         }
 
+        [HttpDelete]
+        [Authorize]
+        [Route("delete/{transactionID}")]
+        public async Task<IActionResult> DeleteTransaction(int transactionID)
+        {
+            try
+            {
+                await _transactionRepository.DeleteTransaction(transactionID);
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "Transaction deleted successfully";
+                _response.Result = default;
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                _response.Result = default;
+                return BadRequest(_response);
+            }
+        }
 
     }
 }
