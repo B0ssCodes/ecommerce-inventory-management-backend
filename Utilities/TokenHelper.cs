@@ -14,12 +14,13 @@ namespace Inventory_Management_Backend.Utilities
             _configuration = configuration;
         }
 
-        public string GenerateAccessToken(string userId, string firstName)
+        public string GenerateAccessToken(string userId, string firstName, int userRoleId)
         {
             var claims = new[]
             {
                 new Claim (ClaimTypes.NameIdentifier, userId),
-                new Claim (ClaimTypes.Name, firstName)
+                new Claim (ClaimTypes.Name, firstName),
+                new Claim (ClaimTypes.Role, userRoleId.ToString())
             };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));

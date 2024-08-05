@@ -2,7 +2,7 @@
 {
     public class UserPermission
     {
-        public int PermissionID { get; set; }
+        public int UserPermissionID { get; set; }
         public string Permission { get; set; }
     }
 }

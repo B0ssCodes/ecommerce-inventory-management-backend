@@ -10,30 +10,50 @@ namespace Inventory_Management_Backend.Repository
     public class UserRoleRepository : IUserRoleRepository
     {
         private readonly DapperContext _db;
-
-        public UserRoleRepository(DapperContext db)
+        private readonly IUserPermissionRepository _userPermissionRepository;
+        public UserRoleRepository(DapperContext db, IUserPermissionRepository userPermissionRepository)
         {
             _db = db;
+            _userPermissionRepository = userPermissionRepository;
         }
 
-        public async Task<UserRoleDTO> CreateUserRole(UserRoleRequestDTO requestDTO)
+        public async Task CreateUserRole(UserRoleRequestDTO requestDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
                 var query = @"
-            INSERT INTO user_role (role)
-            VALUES (@Name)
-            RETURNING user_role_id_pkey AS UserRoleID, role AS Role";
+                INSERT INTO user_role (role)
+                VALUES (@Name)
+                RETURNING user_role_id_pkey;";
 
                 var parameters = new { Name = requestDTO.RoleName };
-                UserRoleDTO userDTO = await connection.QueryFirstOrDefaultAsync<UserRoleDTO>(query, parameters);
+               int roleID = await connection.QuerySingleAsync<int>(query, parameters);
 
-                if (userDTO == null)
+                if (roleID == 0)
                 {
                     throw new Exception("Failed to create user role");
                 }
 
-                return userDTO;
+                if (requestDTO.Permissions != null)
+                {
+                    foreach (var permission in requestDTO.Permissions)
+                    {
+                        int permissionID = await _userPermissionRepository.PermissionExists(new UserPermissionRequestDTO { Permission = permission });
+                        if (permissionID == 0)
+                        {
+                            permissionID = await _userPermissionRepository.CreateUserPermission(new UserPermissionRequestDTO { Permission = permission });
+                        }
+
+                        var associateQuery = @"
+                            INSERT INTO user_role_permission (user_role_id, user_permission_id)
+                            VALUES (@UserRoleID, @UserPermissionID);";
+
+                        var associateParameters = new { UserRoleID = roleID, UserPermissionID = permissionID };
+                        await connection.ExecuteAsync(associateQuery, associateParameters);
+
+                        
+                    }
+                }
             }
         }
 
@@ -77,18 +97,42 @@ namespace Inventory_Management_Backend.Repository
             using (IDbConnection connection = _db.CreateConnection())
             {
                 var query = @"
-                    SELECT user_role_id_pkey AS UserRoleID, role AS Role
-                    FROM user_role
-                    WHERE user_role_id_pkey = @UserRoleID";
+            SELECT ur.user_role_id_pkey AS UserRoleID,
+                   ur.role AS Role,
+                   up.user_permission_id_pkey AS UserPermissionID,
+                   up.permission AS Permission
+            FROM user_role ur
+            LEFT JOIN user_role_permission urp ON ur.user_role_id_pkey = urp.user_role_id
+            LEFT JOIN user_permission up ON up.user_permission_id_pkey = urp.user_permission_id
+            WHERE ur.user_role_id_pkey = @UserRoleID";
 
                 var parameters = new { UserRoleID = userRoleId };
 
-                UserRoleDTO userRoleDTO = await connection.QueryFirstOrDefaultAsync<UserRoleDTO>(query, parameters);
-                if (userRoleDTO == null)
-                {
-                    throw new Exception("User role not found");
-                }
-                return userRoleDTO;
+                var userRoleDictionary = new Dictionary<int, UserRoleDTO>();
+
+                var result = await connection.QueryAsync<UserRoleDTO, AllUserPermissionResponseDTO, UserRoleDTO>(
+                    query,
+                    (userRole, permission) =>
+                    {
+                        if (!userRoleDictionary.TryGetValue(userRole.UserRoleID, out var currentUserRole))
+                        {
+                            currentUserRole = userRole;
+                            currentUserRole.Permissions = new List<AllUserPermissionResponseDTO>();
+                            userRoleDictionary.Add(currentUserRole.UserRoleID, currentUserRole);
+                        }
+
+                        if (permission != null)
+                        {
+                            currentUserRole.Permissions.Add(permission);
+                        }
+
+                        return currentUserRole;
+                    },
+                    parameters,
+                    splitOn: "UserPermissionID"
+                );
+
+                return userRoleDictionary.Values.FirstOrDefault();
             }
         }
 
@@ -140,24 +184,65 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task<UserRoleDTO> UpdateUserRole(int roleId, UserRoleRequestDTO requestDTO)
+        public async Task UpdateUserRole(int roleId, UserRoleRequestDTO requestDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
-                var query = @"
+                connection.Open();
+                using (var transaction = connection.BeginTransaction())
+                {
+                    try
+                    {
+                        // Update the role name
+                        var query = @"
                     UPDATE user_role
                     SET role = @RoleName
                     WHERE user_role_id_pkey = @Id
                     RETURNING user_role_id_pkey as UserRoleID, role AS Role";
 
-                var parameters = new { RoleName = requestDTO.RoleName, Id = roleId };
-                UserRoleDTO updatedUserRole = await connection.QueryFirstOrDefaultAsync<UserRoleDTO>(query, parameters);
+                        var parameters = new { RoleName = requestDTO.RoleName, Id = roleId };
+                        UserRoleDTO updatedUserRole = await connection.QueryFirstOrDefaultAsync<UserRoleDTO>(query, parameters, transaction);
 
-                if (updatedUserRole == null)
-                {
-                    throw new Exception("Failed to update user role");
+                        if (updatedUserRole == null)
+                        {
+                            throw new Exception("Failed to update user role");
+                        }
+
+ 
+                        var deletePermissionsQuery = @"
+                    DELETE FROM user_role_permission
+                    WHERE user_role_id = @UserRoleID";
+
+                        await connection.ExecuteAsync(deletePermissionsQuery, new { UserRoleID = roleId }, transaction);
+
+                       
+                        if (requestDTO.Permissions != null)
+                        {
+                            foreach (var permission in requestDTO.Permissions)
+                            {
+                                int permissionID = await _userPermissionRepository.PermissionExists(new UserPermissionRequestDTO { Permission = permission });
+                                if (permissionID == 0)
+                                {
+                                    permissionID = await _userPermissionRepository.CreateUserPermission(new UserPermissionRequestDTO { Permission = permission });
+                                }
+
+                                var associateQuery = @"
+                            INSERT INTO user_role_permission (user_role_id, user_permission_id)
+                            VALUES (@UserRoleID, @UserPermissionID)";
+
+                                var associateParameters = new { UserRoleID = roleId, UserPermissionID = permissionID };
+                                await connection.ExecuteAsync(associateQuery, associateParameters, transaction);
+                            }
+                        }
+
+                        transaction.Commit();
+                    }
+                    catch (Exception ex)
+                    {
+                        transaction.Rollback();
+                        throw new Exception("Failed to update user role and permissions", ex);
+                    }
                 }
-                return updatedUserRole;
             }
         }
     }

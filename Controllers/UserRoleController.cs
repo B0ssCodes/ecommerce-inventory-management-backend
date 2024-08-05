@@ -76,11 +76,11 @@ namespace Inventory_Management_Backend.Controllers
         {
             try
             {
-                UserRoleDTO userRole = await _userRoleRepository.CreateUserRole(requestDTO);
+                 await _userRoleRepository.CreateUserRole(requestDTO);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "User role created successfully";
-                _response.Result = userRole;
+                _response.Result = default;
                 return Ok(_response);
             }
             
@@ -100,11 +100,11 @@ namespace Inventory_Management_Backend.Controllers
         {
             try
             {
-                UserRoleDTO userRole = await _userRoleRepository.UpdateUserRole(roleId, requestDTO);
+                await _userRoleRepository.UpdateUserRole(roleId, requestDTO);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "User role updated successfully";
-                _response.Result = userRole;
+                _response.Result = default;
                 return Ok(_response);
             }
             

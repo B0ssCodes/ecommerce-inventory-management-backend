@@ -4,5 +4,6 @@
     {
         public int UserRoleID { get; set; } 
         public string Role { get; set; }
+        public List<AllUserPermissionResponseDTO> Permissions { get; set; }
     }
 }

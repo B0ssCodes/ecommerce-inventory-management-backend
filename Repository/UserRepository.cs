@@ -45,7 +45,8 @@ namespace Inventory_Management_Backend.Repository
             user_first_name AS FirstName,
             u.user_last_name AS LastName,
             u.user_email AS Email, 
-            r.role 
+            r.user_role_id_pkey AS RoleID,
+            r.role AS Role 
             FROM user_info u
             INNER JOIN user_role r
             ON u.user_role_id = r.user_role_id_pkey

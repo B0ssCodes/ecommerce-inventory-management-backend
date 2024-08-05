@@ -22,7 +22,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPost]
-        [Authorize]
+        //[Authorize]
         [Route("get")]
         public async Task<IActionResult> GetUsers(PaginationParams paginationParams)
         {
@@ -49,7 +49,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpGet]
-        [Authorize]
+        //[Authorize]
         [Route("get/{userID}")]
         public async Task<IActionResult> GetUser(int userID)
         {
