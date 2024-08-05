@@ -128,13 +128,14 @@ namespace Inventory_Management_Backend.Repository
         }
 
 
-        public async Task<(List<AllTransactionResponseDTO>, int)> GetTransactions(PaginationParams paginationParams)
+        public async Task<(List<AllTransactionResponseDTO>, int)> GetTransactions(string? vendorEmail, PaginationParams paginationParams)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
                 connection.Open();
 
-                var transactionsQuery = @"
+                // Base query
+                var baseQuery = @"
         WITH TransactionCTE AS (
             SELECT 
                 t.transaction_id_pkey AS TransactionID,
@@ -154,7 +155,16 @@ namespace Inventory_Management_Backend.Repository
                    t.transaction_date::TEXT ILIKE '%' || @Search || '%' OR
                    tt.type ILIKE '%' || @Search || '%' OR
                    ts.status ILIKE '%' || @Search || '%' OR
-                   v.vendor_name ILIKE '%' || @Search || '%')
+                   v.vendor_name ILIKE '%' || @Search || '%')";
+
+                // Add vendor ID conditionally
+                if (vendorEmail != null)
+                {
+                    baseQuery += " AND v.vendor_email = @VendorEmail";
+                }
+
+                // Complete the query
+                var transactionsQuery = baseQuery + @"
         )
         SELECT TransactionID, Amount, Date, Type, Status, VendorID, Name, TotalCount
         FROM TransactionCTE
@@ -163,6 +173,7 @@ namespace Inventory_Management_Backend.Repository
 
                 var parameters = new
                 {
+                    VendorEmail = vendorEmail,
                     Offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize,
                     PageSize = paginationParams.PageSize,
                     Search = paginationParams.Search
@@ -196,8 +207,6 @@ namespace Inventory_Management_Backend.Repository
                 {
                     try
                     {
-
-
                         var transactionCheckQuery = @"
                     SELECT transaction_status_id AS TransactionStatusID, transaction_type_id AS TransactionTypeID
                     FROM transaction

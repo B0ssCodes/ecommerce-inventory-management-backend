@@ -24,13 +24,12 @@ namespace Inventory_Management_Backend.Controllers
         [HttpPost]
         [Authorize]
         [Route("get")]
-        public async Task<IActionResult> GetTransactions(PaginationParams paginationParams)
+        public async Task<IActionResult> GetTransactions(VendorTransactionDTO transactionDTO)
         {
             try
             {
 
-
-                var (transactions, itemCount) = await _transactionRepository.GetTransactions(paginationParams);
+                var (transactions, itemCount) = await _transactionRepository.GetTransactions(transactionDTO.VendorEmail, transactionDTO.PaginationParams);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Transactions fetched successfully";

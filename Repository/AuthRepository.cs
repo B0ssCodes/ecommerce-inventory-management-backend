@@ -102,7 +102,7 @@ namespace Inventory_Management_Backend.Repository
 
                 // Generate the token using Token Helper, it takes the configuration (appsettings.json)
                 var tokenService = new TokenHelper(_configuration);
-                var token = tokenService.GenerateAccessToken(userWithRole.UserId.ToString(), userWithRole.FirstName, userWithRole.UserRoleID);
+                var token = tokenService.GenerateAccessToken(userWithRole.UserId.ToString(), userWithRole.FirstName, userWithRole.UserRoleID, userWithRole.UserRole, userWithRole.Email);
 
                 var response = new LoginResponseDTO
                 {

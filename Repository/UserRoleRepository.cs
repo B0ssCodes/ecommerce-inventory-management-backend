@@ -66,6 +66,12 @@ namespace Inventory_Management_Backend.Repository
                 {
                     try
                     {
+                        var deletePermissionsQuery = @"
+                            DELETE FROM user_role_permission
+                            WHERE user_role_id = @RoleID";
+
+                        var deletePermissionsParameters = new { RoleID = roleId };
+                        await connection.ExecuteAsync(deletePermissionsQuery, deletePermissionsParameters, transaction);
 
                         var deleteUserQuery = @"
                         DELETE FROM user_info
@@ -80,6 +86,8 @@ namespace Inventory_Management_Backend.Repository
 
                         var deleteUserRoleParameters = new { RoleID = roleId };
                         await connection.ExecuteAsync(deleteUserRoleQuery, deleteUserRoleParameters, transaction);
+
+                       
 
                         transaction.Commit();
                     }
