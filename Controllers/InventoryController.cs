@@ -115,5 +115,51 @@ namespace Inventory_Management_Backend.Controllers
                 return BadRequest(_response);
             }
         }
+
+        [HttpGet]
+        [Route("getlowCount/{minStockQuantity}")]
+        public async Task<IActionResult> GetLowStockInventoriesCount(int minStockQuantity)
+        {
+            try
+            {
+                int totalCount = await _inventoryRepository.GetLowStockInventoriesCount(minStockQuantity);
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "Low stock inventories count fetched successfully";
+                _response.Result = totalCount;
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                _response.Result = default;
+                return BadRequest(_response);
+            }
+        }
+
+        [HttpGet]
+        [Route("getoutCount")]
+        public async Task<IActionResult> GetOutStockInventoriesCount()
+        {
+            try
+            {
+                int totalCount = await _inventoryRepository.GetOutStockInventoriesCount();
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "Out of stock inventories count fetched successfully";
+                _response.Result = totalCount;
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                _response.Result = default;
+                return BadRequest(_response);
+            }
+        }
     }
 }

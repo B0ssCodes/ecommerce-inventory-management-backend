@@ -332,14 +332,39 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public Task<int> GetLowStockInventoriesCount(int minStockQuantity)
+        public async Task<int> GetLowStockInventoriesCount(int minStockQuantity)
         {
-            throw new NotImplementedException();
+            using (IDbConnection connection = _db.CreateConnection())
+            {
+                var query = @"
+                SELECT COUNT(*) OVER()
+                FROM inventory
+                WHERE inventory_stock < @MinStockQuantity;";
+
+                var parameters = new { MinStockQuantity = minStockQuantity };
+
+                int result = await connection.QueryFirstOrDefaultAsync<int>(query, parameters);
+
+                return result;
+            }
         }
 
-        public Task<int> GetOutStockInventoriesCount()
+        public async Task<int> GetOutStockInventoriesCount()
         {
-            throw new NotImplementedException();
+            using (IDbConnection connection = _db.CreateConnection())
+            {
+                connection.Open();
+
+                var query = @"
+            SELECT COUNT(*)
+            FROM product p
+            LEFT JOIN inventory i ON p.product_id_pkey = i.product_id
+            WHERE i.product_id IS NULL;";
+
+                int result = await connection.QueryFirstOrDefaultAsync<int>(query);
+
+                return result;
+            }
         }
     }
 }
