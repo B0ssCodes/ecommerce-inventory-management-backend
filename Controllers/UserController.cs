@@ -96,6 +96,29 @@ namespace Inventory_Management_Backend.Controllers
             }
         }
 
+        [HttpPut]
+        [Route("update/{userID}")]
+        public async Task<IActionResult> UpdateUser(int userID, UserUpdateDTO updateDTO)
+        {
+            try
+            {
+                await _userRepository.UpdateUser(userID, updateDTO);
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "User updated successfully";
+                _response.Result = default;
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.StatusCode = HttpStatusCode.InternalServerError;
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                _response.Result = default;
+                return BadRequest(_response);
+            }
+        }
+
 
     }
 }

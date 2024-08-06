@@ -8,7 +8,7 @@ namespace Inventory_Management_Backend.Repository.IRepository
 
         public Task<(List<UserResponseDTO>, int itemCount)> GetUsers(PaginationParams paginationParams);
         public Task<UserResponseDTO> GetUser(int userID);
-        //public Task UpdateUser (RegisterRequestDTO user);
+        public Task UpdateUser (int userID, UserUpdateDTO updateDTO);
         public Task DeleteUser(int userID);
     }
 }

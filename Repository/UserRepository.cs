@@ -45,7 +45,7 @@ namespace Inventory_Management_Backend.Repository
             user_first_name AS FirstName,
             u.user_last_name AS LastName,
             u.user_email AS Email, 
-            r.user_role_id_pkey AS RoleID,
+            r.user_role_id_pkey AS UserRoleID,
             r.role AS Role 
             FROM user_info u
             INNER JOIN user_role r
@@ -81,6 +81,7 @@ namespace Inventory_Management_Backend.Repository
                 u.user_first_name AS FirstName,
                 u.user_last_name AS LastName, 
                 u.user_email AS Email, 
+                r.user_role_id_pkey AS UserRoleID,
                 r.role AS Role,
                 COUNT(*) OVER() AS UserCount
             FROM user_info u
@@ -90,7 +91,7 @@ namespace Inventory_Management_Backend.Repository
                    u.user_last_name ILIKE '%' || @SearchQuery || '%' OR 
                    u.user_email ILIKE '%' || @SearchQuery || '%')
         )
-        SELECT UserID, FirstName, LastName, Email, Role, UserCount
+        SELECT UserID, FirstName, LastName, Email, UserRoleID, Role, UserCount
         FROM UserCTE
         ORDER BY FirstName
         OFFSET @Offset ROWS
@@ -116,6 +117,28 @@ namespace Inventory_Management_Backend.Repository
                 return (users, totalCount);
             }
         }
-        \
+        
+        public async Task UpdateUser(int userID, UserUpdateDTO updateDTO)
+        {
+            using (IDbConnection connection = _db.CreateConnection())
+            {
+                var query = @"
+                    UPDATE user_info
+                    SET user_first_name = @FirstName,
+                        user_last_name = @LastName,
+                        user_role_id = @RoleID
+                    WHERE user_id_pkey = @UserID";
+
+                var parameters = new
+                {
+                    UserID = userID,
+                    FirstName = updateDTO.FirstName,
+                    LastName = updateDTO.LastName,
+                    RoleID = updateDTO.UserRoleID
+                };
+
+                await connection.ExecuteAsync(query, parameters);
+            }
+        }
     }
 }
