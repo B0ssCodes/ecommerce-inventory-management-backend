@@ -12,7 +12,6 @@ This is the backend for the Inventory Management system. It provides APIs for ma
 ## Technologies Used
 
 - ASP.NET Core
-- Entity Framework Core
 - PostgreSQL
 - Dapper
 - JWT for authentication

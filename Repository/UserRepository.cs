@@ -116,20 +116,6 @@ namespace Inventory_Management_Backend.Repository
                 return (users, totalCount);
             }
         }
-        // TODO: Implement UpdateUser method, no use for it now though
-        //public Task UpdateUser(RegisterRequestDTO user)
-        //{
-        //    using (IDbConnection connection = _db.CreateConnection())
-        //    {
-        //        connection.Open();
-
-        //        var query = @"
-        //            UPDATE user
-        //            SET user_first_name = @FirstName,
-        //                user_last_name = @LastName,
-        //                user_email = @Email,
-        //                ";
-        //    }
-        //}
+        \
     }
 }
