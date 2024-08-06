@@ -242,6 +242,7 @@ namespace Inventory_Management_Backend.Repository
                     SELECT i.inventory_id_pkey AS InventoryID,
                            i.inventory_stock AS Quantity,
                            i.inventory_cost AS Price,
+                           p.product_id_pkey AS ProductID,
                            p.product_name AS ProductName,
                            p.sku AS ProductSKU,
                            p.product_cost_price AS ProductPrice,
@@ -253,7 +254,7 @@ namespace Inventory_Management_Backend.Repository
                             OR CAST(i.inventory_stock AS TEXT) ILIKE '%' || @SearchQuery || '%')
                             AND i.inventory_stock < @MinStockQuantity
                     )   
-                    SELECT InventoryID, Quantity, Price, ProductName, ProductSKU, ProductPrice, TotalCount
+                    SELECT InventoryID, Quantity, Price, ProductID, ProductName, ProductSKU, ProductPrice, TotalCount
                     FROM InventoryCTE
                     ORDER BY InventoryID DESC
                     OFFSET @Offset ROWS
@@ -293,9 +294,9 @@ namespace Inventory_Management_Backend.Repository
                 var query = @"
             WITH ProductsWithoutInventoryCTE AS (
                 SELECT p.product_id_pkey AS ProductID,
-                       p.product_name AS Name,
-                       p.sku AS SKU,
-                       p.product_cost_price AS Price,
+                       p.product_name AS ProductName,
+                       p.sku AS ProductSKU,
+                       p.product_cost_price AS ProductPrice,
                        COUNT(*) OVER() AS TotalCount
                 FROM product p
                 LEFT JOIN inventory i ON p.product_id_pkey = i.product_id
@@ -304,7 +305,7 @@ namespace Inventory_Management_Backend.Repository
                        OR p.sku ILIKE '%' || @SearchQuery || '%'
                        OR CAST(p.product_cost_price AS TEXT) ILIKE '%' || @SearchQuery || '%')
             )
-            SELECT ProductID, Name, SKU, Price, TotalCount
+            SELECT ProductID, ProductName, ProductSKU, ProductPrice, TotalCount
             FROM ProductsWithoutInventoryCTE
             ORDER BY ProductID DESC
             OFFSET @Offset ROWS
