@@ -1,5 +1,6 @@
 ﻿using Inventory_Management_Backend.Models;
 using Inventory_Management_Backend.Repository.IRepository;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
@@ -7,6 +8,7 @@ using System.Net;
 namespace Inventory_Management_Backend.Controllers
 {
     [Route("api/inventory")]
+    [Authorize]
     [ApiController]
     public class InventoryController : ControllerBase
     {

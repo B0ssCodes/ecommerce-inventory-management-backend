@@ -9,6 +9,7 @@ using System.Net;
 namespace Inventory_Management_Backend.Controllers
 {
     [Route("api/user")]
+    [Authorize]
     [ApiController]
     public class UserController : ControllerBase
     {

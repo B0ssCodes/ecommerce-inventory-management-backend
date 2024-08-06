@@ -7,6 +7,7 @@ using System.Net;
 namespace Inventory_Management_Backend.Controllers
 {
     [Route("api/product")]
+    [Authorize]
     [ApiController]
     public class ProductController : ControllerBase
     {

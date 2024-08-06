@@ -1,6 +1,7 @@
 ﻿using Inventory_Management_Backend.Models;
 using Inventory_Management_Backend.Models.Dto;
 using Inventory_Management_Backend.Repository.IRepository;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 
@@ -20,6 +21,7 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPost]
+        [Authorize]
         [Route("register")]
         public async Task<IActionResult> Register(RegisterRequestDTO registerDTO)
         {
