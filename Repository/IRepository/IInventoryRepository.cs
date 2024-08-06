@@ -18,7 +18,7 @@ namespace Inventory_Management_Backend.Repository.IRepository
         public Task<(List<AllInventoryResponseDTO>, int)> GetLowStockInventories(PaginationParams paginationParams);
 
         // Returns a list of all out of stock inventories
-        public Task<(List<AllInventoryResponseDTO>, int)> GetOutStockInventories(PaginationParams paginationParams);
+        public Task<(List<ProductWithoutInventoryDTO>, int)> GetOutStockInventories(PaginationParams paginationParams);
 
         // Creates a new inventory based on the product ID
         public Task<int> CreateInventory(TransactionItemRequestDTO requestDTO);

@@ -228,6 +228,104 @@ namespace Inventory_Management_Backend.Repository
                 return result;
             }
         }
+
+        public async Task<(List<AllInventoryResponseDTO>, int)> GetLowStockInventories(PaginationParams paginationParams)
+        {
+            using (IDbConnection connection = _db.CreateConnection())
+            {
+                connection.Open();
+
+                var offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
+
+                var query = @"
+                 WITH InventoryCTE AS (
+                    SELECT i.inventory_id_pkey AS InventoryID,
+                           i.inventory_stock AS Quantity,
+                           i.inventory_cost AS Price,
+                           p.product_name AS ProductName,
+                           p.sku AS ProductSKU,
+                           p.product_cost_price AS ProductPrice,
+                           COUNT (*) OVER() AS TotalCount
+                    FROM inventory i
+                    JOIN product p ON i.product_id = p.product_id_pkey
+                    WHERE (@SearchQuery IS NULL OR p.product_name ILIKE '%' || @SearchQuery || '%'
+                            OR p.sku ILIKE '%' || @SearchQuery || '%'
+                            OR CAST(i.inventory_stock AS TEXT) ILIKE '%' || @SearchQuery || '%')
+                            AND i.inventory_stock < @MinStockQuantity
+                    )   
+                    SELECT InventoryID, Quantity, Price, ProductName, ProductSKU, ProductPrice, TotalCount
+                    FROM InventoryCTE
+                    ORDER BY InventoryID DESC
+                    OFFSET @Offset ROWS
+                    FETCH NEXT @PageSize ROWS ONLY;";
+
+                var parameters = new
+                {
+                    MinStockQuantity = 10,
+                    Offset = offset,
+                    PageSize = paginationParams.PageSize,
+                    SearchQuery = paginationParams.Search
+                };
+
+                var result = await connection.QueryAsync<AllInventoryResponseDTO, long, (AllInventoryResponseDTO, long)>(
+                    query,
+                    (inventory, totalCount) => (inventory, totalCount),
+                    parameters,
+                    splitOn: "TotalCount"
+                    );
+
+                var inventories = result.Select(x => x.Item1).ToList();
+                var totalCount = (int)result.FirstOrDefault().Item2;
+
+                return (inventories, totalCount);
+
+            }
+        }
+
+        public async Task<(List<ProductWithoutInventoryDTO>, int)> GetOutStockInventories(PaginationParams paginationParams)
+        {
+            using (IDbConnection connection = _db.CreateConnection())
+            {
+                connection.Open();
+
+                var offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
+
+                var query = @"
+            WITH ProductsWithoutInventoryCTE AS (
+                SELECT p.product_id_pkey AS ProductID,
+                       p.product_name AS Name,
+                       p.sku AS SKU,
+                       p.product_cost_price AS Price,
+                       COUNT(*) OVER() AS TotalCount
+                FROM product p
+                LEFT JOIN inventory i ON p.product_id_pkey = i.product_id
+                WHERE i.product_id IS NULL
+            )
+            SELECT ProductID, Name, SKU, Price, TotalCount
+            FROM ProductsWithoutInventoryCTE
+            ORDER BY ProductID DESC
+            OFFSET @Offset ROWS
+            FETCH NEXT @PageSize ROWS ONLY;";
+
+                var parameters = new
+                {
+                    Offset = offset,
+                    PageSize = paginationParams.PageSize
+                };
+
+                var result = await connection.QueryAsync<ProductWithoutInventoryDTO, long, (ProductWithoutInventoryDTO, long)>(
+                    query,
+                    (product, totalCount) => (product, totalCount),
+                    parameters,
+                    splitOn: "TotalCount"
+                );
+
+                var products = result.Select(x => x.Item1).ToList();
+                var totalCount = (int)result.FirstOrDefault().Item2;
+
+                return (products, totalCount);
+            }
+        }
     }
 }
 

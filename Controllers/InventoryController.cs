@@ -8,7 +8,7 @@ using System.Net;
 namespace Inventory_Management_Backend.Controllers
 {
     [Route("api/inventory")]
-    [Authorize]
+
     [ApiController]
     public class InventoryController : ControllerBase
     {
@@ -67,7 +67,53 @@ namespace Inventory_Management_Backend.Controllers
                 return BadRequest(_response);
             }
         }
-        
 
+        [HttpPost]
+        [Route("getlow")]
+        public async Task<IActionResult> GetLowStockInventories(PaginationParams paginationParams)
+        {
+            try
+            {
+                var (inventories, totalCount) = await _inventoryRepository.GetLowStockInventories(paginationParams);
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "Low stock inventories fetched successfully";
+                _response.Result = inventories;
+                _response.ItemCount = totalCount;
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                _response.Result = default;
+                return BadRequest(_response);
+            }
+        }
+
+        [HttpPost]
+        [Route("getout")]
+        public async Task<IActionResult> GetOutStockInventories(PaginationParams paginationParams)
+        {
+            try
+            {
+                var (inventories, totalCount) = await _inventoryRepository.GetOutStockInventories(paginationParams);
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "Out of stock inventories fetched successfully";
+                _response.Result = inventories;
+                _response.ItemCount = totalCount;
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                _response.Result = default;
+                return BadRequest(_response);
+            }
+        }
     }
 }
