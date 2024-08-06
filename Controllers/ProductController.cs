@@ -7,7 +7,6 @@ using System.Net;
 namespace Inventory_Management_Backend.Controllers
 {
     [Route("api/product")]
-    [Authorize]
     [ApiController]
     public class ProductController : ControllerBase
     {
@@ -28,6 +27,31 @@ namespace Inventory_Management_Backend.Controllers
             try
             {
                 var(products, itemCount) = await _productRepository.GetProducts(paginationParams);
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "Products retrieved successfully";
+                _response.Result = products;
+                _response.ItemCount = itemCount;
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                _response.Result = default;
+                return BadRequest(_response);
+            }
+        }
+
+        [HttpPost]
+        //[Authorize]
+        [Route("getSelect")]
+        public async Task<IActionResult> GetProductsSelect(PaginationParams paginationParams)
+        {
+            try
+            {
+                var (products, itemCount) = await _productRepository.GetProductsSelect(paginationParams);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Products retrieved successfully";

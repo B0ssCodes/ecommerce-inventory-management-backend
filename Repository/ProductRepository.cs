@@ -381,6 +381,58 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
+        public async Task<(List<ProductSelectResponseDTO>, int itemCount)> GetProductsSelect(PaginationParams paginationParams)
+        {
+            using (IDbConnection connection = _db.CreateConnection())
+            {
+                connection.Open(); // Explicitly open the connection
+
+                var offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
+
+                var query = @"
+        WITH ProductCTE AS (
+            SELECT 
+                p.product_id_pkey AS ProductID, 
+                p.sku AS SKU, 
+                p.product_name AS Name,  
+                p.product_cost_price AS Cost, 
+                COALESCE(i.inventory_stock, 0) AS Quantity,
+                c.category_name AS Category,
+                COUNT(*) OVER() AS TotalCount
+            FROM product p
+            JOIN category c ON p.category_id = c.category_id_pkey
+            LEFT JOIN inventory i ON p.product_id_pkey = i.product_id
+            WHERE (@SearchQuery IS NULL OR p.product_name ILIKE '%' || @SearchQuery || '%' 
+                   OR p.product_description ILIKE '%' || @SearchQuery || '%' 
+                   OR p.sku ILIKE '%' || @SearchQuery || '%')
+        )
+        SELECT ProductID, SKU, Name, Cost, Quantity, Category, TotalCount
+        FROM ProductCTE
+        ORDER BY ProductID DESC
+        OFFSET @Offset ROWS
+        FETCH NEXT @PageSize ROWS ONLY;";
+
+                var parameters = new
+                {
+                    Offset = offset,
+                    PageSize = paginationParams.PageSize,
+                    SearchQuery = paginationParams.Search
+                };
+
+                var result = await connection.QueryAsync<ProductSelectResponseDTO, long, (ProductSelectResponseDTO, long)>(
+                    query,
+                    (product, totalCount) => (product, totalCount),
+                    parameters,
+                    splitOn: "TotalCount"
+                );
+
+                var products = result.Select(r => r.Item1).ToList();
+                int totalCount = result.Any() ? (int)result.First().Item2 : 0; // Explicitly cast to int
+
+                return (products, totalCount);
+            }
+        }
+
         public async Task<ProductResponseDTO> UpdateProduct(int productID, ProductRequestDTO productRequestDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())
