@@ -229,7 +229,7 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task<(List<AllInventoryResponseDTO>, int)> GetLowStockInventories(PaginationParams paginationParams)
+        public async Task<(List<AllInventoryResponseDTO>, int)> GetLowStockInventories(int minStockQuantity,PaginationParams paginationParams)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
@@ -261,7 +261,7 @@ namespace Inventory_Management_Backend.Repository
 
                 var parameters = new
                 {
-                    MinStockQuantity = 10,
+                    MinStockQuantity = minStockQuantity,
                     Offset = offset,
                     PageSize = paginationParams.PageSize,
                     SearchQuery = paginationParams.Search
@@ -300,6 +300,9 @@ namespace Inventory_Management_Backend.Repository
                 FROM product p
                 LEFT JOIN inventory i ON p.product_id_pkey = i.product_id
                 WHERE i.product_id IS NULL
+                  AND (@SearchQuery IS NULL OR p.product_name ILIKE '%' || @SearchQuery || '%'
+                       OR p.sku ILIKE '%' || @SearchQuery || '%'
+                       OR CAST(p.product_cost_price AS TEXT) ILIKE '%' || @SearchQuery || '%')
             )
             SELECT ProductID, Name, SKU, Price, TotalCount
             FROM ProductsWithoutInventoryCTE
@@ -310,7 +313,8 @@ namespace Inventory_Management_Backend.Repository
                 var parameters = new
                 {
                     Offset = offset,
-                    PageSize = paginationParams.PageSize
+                    PageSize = paginationParams.PageSize,
+                    SearchQuery = paginationParams.Search
                 };
 
                 var result = await connection.QueryAsync<ProductWithoutInventoryDTO, long, (ProductWithoutInventoryDTO, long)>(

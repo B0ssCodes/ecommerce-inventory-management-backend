@@ -69,12 +69,12 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPost]
-        [Route("getlow")]
-        public async Task<IActionResult> GetLowStockInventories(PaginationParams paginationParams)
+        [Route("getlow/{minStockQuantity}")]
+        public async Task<IActionResult> GetLowStockInventories(int minStockQuantity, PaginationParams paginationParams)
         {
             try
             {
-                var (inventories, totalCount) = await _inventoryRepository.GetLowStockInventories(paginationParams);
+                var (inventories, totalCount) = await _inventoryRepository.GetLowStockInventories(minStockQuantity, paginationParams);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Low stock inventories fetched successfully";
