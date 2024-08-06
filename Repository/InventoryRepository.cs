@@ -331,6 +331,16 @@ namespace Inventory_Management_Backend.Repository
                 return (products, totalCount);
             }
         }
+
+        public Task<int> GetLowStockInventoriesCount(int minStockQuantity)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<int> GetOutStockInventoriesCount()
+        {
+            throw new NotImplementedException();
+        }
     }
 }
 
