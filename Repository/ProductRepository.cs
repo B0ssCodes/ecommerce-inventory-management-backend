@@ -3,6 +3,7 @@ using Inventory_Management_Backend.Data;
 using Inventory_Management_Backend.Models;
 using Inventory_Management_Backend.Models.Dto;
 using Inventory_Management_Backend.Repository.IRepository;
+using Microsoft.Extensions.Caching.Memory;
 using System.Data;
 
 namespace Inventory_Management_Backend.Repository
@@ -16,6 +17,7 @@ namespace Inventory_Management_Backend.Repository
         {
             _db = db;
             _configuration = configuration;
+            
         }
         public async Task<ProductResponseDTO> CreateProduct(ProductRequestDTO productRequestDTO)
         {
