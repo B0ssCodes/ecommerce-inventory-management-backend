@@ -20,12 +20,12 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpGet]
-        [Route("get")]
-        public async Task<IActionResult> GetProductAnalytics()
+        [Route("get/{refreshDays}")]
+        public async Task<IActionResult> GetProductAnalytics(int refreshDays)
         {
             try
             {
-                var result = await _productAnalyticsRepository.GetProductAnalytics();
+                var result = await _productAnalyticsRepository.GetProductAnalytics(refreshDays);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Product analytics fetched successfully";
@@ -40,7 +40,29 @@ namespace Inventory_Management_Backend.Controllers
                 _response.Result = null;
                 return BadRequest(_response);
             }
+        }
 
+        [HttpGet]
+        [Route("reset")]
+        public async Task<IActionResult> ResetProductAnalyticsCache()
+        {
+            try
+            {
+               await _productAnalyticsRepository.ResetProductAnalyticsCache();
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "Product analytics cache reset successfully";
+                _response.Result = null;
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                _response.Result = null;
+                return BadRequest(_response);
+            }
         }
     }
 }
