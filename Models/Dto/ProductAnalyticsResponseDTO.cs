@@ -12,5 +12,7 @@
         public decimal MoneySpent { get; set; }
         public decimal MoneyEarned { get; set; }
         public decimal Profit { get; set; }
+        public DateTime FromDate { get; set; }
+        public DateTime ToDate { get; set; }
     }
 }

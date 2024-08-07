@@ -43,7 +43,7 @@ namespace Inventory_Management_Backend.Repository
                         GROUP BY p.product_id_pkey, p.product_name, p.sku
                         ORDER BY p.product_id_pkey;";
 
-                    var startDate = DateTime.Now.AddDays(-7);
+                    var startDate = DateTime.Now.AddDays(-refreshDays);
 
                     var parameters = new { StartDate = startDate };
 
@@ -55,6 +55,8 @@ namespace Inventory_Management_Backend.Repository
                     foreach (var analytics in analyticsList)
                     {
                         analytics.Profit = analytics.MoneyEarned - analytics.MoneySpent;
+                        analytics.FromDate = startDate;
+                        analytics.ToDate = DateTime.Now;
                     }
 
                     // Set cache options
