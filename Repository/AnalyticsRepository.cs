@@ -8,21 +8,21 @@ using System.Data;
 
 namespace Inventory_Management_Backend.Repository
 {
-    public class ProductAnalyticsRepository : IProductAnalyticsRepository
+    public class AnalyticsRepository : IAnalyticsRepository
     {
         private readonly DapperContext _db;
         private readonly IMemoryCache _cache;
         private const string CacheKey = "ProductAnalytics";
 
-        public ProductAnalyticsRepository(DapperContext db, IMemoryCache cache)
+        public AnalyticsRepository(DapperContext db, IMemoryCache cache)
         {
             _db = db;
             _cache = cache;
         }
 
-        public async Task<List<ProductAnalyticsResponseDTO>> GetProductAnalytics(int refreshDays)
+        public async Task<IEnumerable<ProductAnalyticsResponseDTO>> GetProductAnalytics(int refreshDays)
         {
-            if (!_cache.TryGetValue(CacheKey, out List<ProductAnalyticsResponseDTO> analyticsList))
+            if (!_cache.TryGetValue(CacheKey, out IEnumerable<ProductAnalyticsResponseDTO> analyticsList))
             {
                 using (IDbConnection connection = _db.CreateConnection())
                 {
@@ -49,7 +49,7 @@ namespace Inventory_Management_Backend.Repository
 
                     var result = await connection.QueryAsync<ProductAnalyticsResponseDTO>(query, parameters);
 
-                    analyticsList = result.ToList();
+                    analyticsList = result;
 
                     // Calculate profit for each product
                     foreach (var analytics in analyticsList)
@@ -74,6 +74,42 @@ namespace Inventory_Management_Backend.Repository
         public  async Task ResetProductAnalyticsCache()
         {
             _cache.Remove(CacheKey);
+        }
+
+        public async Task<IEnumerable<VendorAnalyticsResponseDTO>> GetVendorAnalytics(int vendorCount)
+        {
+            using (IDbConnection connection = _db.CreateConnection())
+            {
+                connection.Open();
+
+                var query = @"
+            SELECT 
+                v.vendor_id_pkey AS VendorID,
+                v.vendor_name AS VendorName,
+                v.vendor_email AS VendorEmail,
+                COALESCE(SUM(ti.transaction_item_quantity), 0) AS ProductsSold,
+                COALESCE(SUM(ti.transaction_item_price), 0) AS StockValue
+            FROM vendor v
+            LEFT JOIN transaction t ON v.vendor_id_pkey = t.vendor_id
+            LEFT JOIN transaction_item ti ON t.transaction_id_pkey = ti.transaction_id
+            WHERE t.transaction_type_id = 1
+            GROUP BY v.vendor_id_pkey, v.vendor_name, v.vendor_email
+            ORDER BY ProductsSold DESC
+            LIMIT @VendorCount;";
+
+                var parameters = new { VendorCount = vendorCount };
+
+                var result = await connection.QueryAsync<VendorAnalyticsResponseDTO>(query, parameters);
+
+                return result;
+            }
+        }
+
+
+
+        public Task<IEnumerable<CategoryAnalyticsResponseDTO>> GetCategoryAnalytics(int CategoryCount)
+        {
+            throw new NotImplementedException();
         }
     }
 }

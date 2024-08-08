@@ -8,24 +8,24 @@ namespace Inventory_Management_Backend.Controllers
 {
     [Route("api/analytics")]
     [ApiController]
-    public class ProductAnalyticsController : ControllerBase
+    public class AnalyticsController : ControllerBase
     {
-        private readonly IProductAnalyticsRepository _productAnalyticsRepository;
+        private readonly IAnalyticsRepository _analyticsRepository;
         private readonly ApiResponse _response;
 
-        public ProductAnalyticsController(IProductAnalyticsRepository productAnalyticsRepository, ApiResponse response)
+        public AnalyticsController(IAnalyticsRepository analyticsRepository, ApiResponse response)
         {
-            _productAnalyticsRepository = productAnalyticsRepository;
+            _analyticsRepository = analyticsRepository;
             _response = response;
         }
 
         [HttpGet]
-        [Route("get/{refreshDays}")]
+        [Route("getProduct/{refreshDays}")]
         public async Task<IActionResult> GetProductAnalytics(int refreshDays)
         {
             try
             {
-                var result = await _productAnalyticsRepository.GetProductAnalytics(refreshDays);
+                var result = await _analyticsRepository.GetProductAnalytics(refreshDays);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Product analytics fetched successfully";
@@ -43,16 +43,39 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpGet]
-        [Route("reset")]
+        [Route("resetProduct")]
         public async Task<IActionResult> ResetProductAnalyticsCache()
         {
             try
             {
-               await _productAnalyticsRepository.ResetProductAnalyticsCache();
+               await _analyticsRepository.ResetProductAnalyticsCache();
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Product analytics cache reset successfully";
                 _response.Result = null;
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                _response.Result = null;
+                return BadRequest(_response);
+            }
+        }
+
+        [HttpGet]
+        [Route("getVendor/{VendorCount}")]
+        public async Task<IActionResult> GetVendorAnalytics(int VendorCount)
+        {
+            try
+            {
+                var result = await _analyticsRepository.GetVendorAnalytics(VendorCount);
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "Vendor analytics fetched successfully";
+                _response.Result = result;
                 return Ok(_response);
             }
             catch (Exception ex)
