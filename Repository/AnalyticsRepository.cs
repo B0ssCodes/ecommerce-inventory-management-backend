@@ -107,9 +107,29 @@ namespace Inventory_Management_Backend.Repository
 
 
 
-        public Task<IEnumerable<CategoryAnalyticsResponseDTO>> GetCategoryAnalytics(int CategoryCount)
+        public async Task<IEnumerable<CategoryAnalyticsResponseDTO>> GetCategoryAnalytics(int CategoryCount)
         {
-            throw new NotImplementedException();
+            using (IDbConnection connection = _db.CreateConnection())
+            {
+                var query = @"
+                    SELECT c.category_id_pkey AS CategoryID,
+                           c.category_name AS CategoryName,
+                           COALESCE(SUM(CASE WHEN t.transaction_type_id = 2 THEN ti.transaction_item_quantity ELSE 0 END), 0) AS ProductsSold, 
+                            COALESCE(SUM(CASE WHEN t.transaction_type_id = 2 THEN ti.transaction_item_price ELSE 0 END), 0) AS StockValue
+                    FROM category c
+                    LEFT JOIN product p ON c.category_id_pkey = p.category_id
+                    LEFT JOIN transaction_item ti ON p.product_id_pkey = ti.product_id
+                    LEFT JOIN transaction t ON ti.transaction_id = t.transaction_id_pkey
+                    GROUP BY c.category_id_pkey, c.category_name
+                    ORDER BY StockValue DESC
+                    LIMIT @CategoryCount;";
+                
+                var parameters = new { CategoryCount = CategoryCount };
+
+                var result = await connection.QueryAsync<CategoryAnalyticsResponseDTO>(query, parameters);
+
+                return result;
+            }
         }
     }
 }

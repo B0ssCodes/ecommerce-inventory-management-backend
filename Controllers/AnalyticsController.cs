@@ -87,5 +87,28 @@ namespace Inventory_Management_Backend.Controllers
                 return BadRequest(_response);
             }
         }
+
+        [HttpGet]
+        [Route("getCategory/{CategoryCount}")]
+        public async Task<IActionResult> GetCategoryAnalytics(int CategoryCount)
+        {
+            try
+            {
+                var result = await _analyticsRepository.GetCategoryAnalytics(CategoryCount);
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "Category analytics fetched successfully";
+                _response.Result = result;
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                _response.Result = null;
+                return BadRequest(_response);
+            }
+        }
     }
 }

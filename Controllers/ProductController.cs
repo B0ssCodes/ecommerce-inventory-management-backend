@@ -46,12 +46,12 @@ namespace Inventory_Management_Backend.Controllers
 
         [HttpPost]
         //[Authorize]
-        [Route("getSelect")]
-        public async Task<IActionResult> GetProductsSelect(PaginationParams paginationParams)
+        [Route("getSelect/{transactionTypeID}")]
+        public async Task<IActionResult> GetProductsSelect(int transactionTypeID, PaginationParams paginationParams)
         {
             try
             {
-                var (products, itemCount) = await _productRepository.GetProductsSelect(paginationParams);
+                var (products, itemCount) = await _productRepository.GetProductsSelect(transactionTypeID, paginationParams);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Products retrieved successfully";

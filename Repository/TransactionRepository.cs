@@ -174,6 +174,7 @@ namespace Inventory_Management_Backend.Repository
                 t.transaction_id_pkey AS TransactionID,
                 t.transaction_amount AS Amount,
                 t.transaction_date AS Date,
+                tt.transaction_type_id_pkey AS TypeID,
                 tt.type AS Type,
                 ts.status AS Status,
                 v.vendor_id_pkey AS VendorID,
@@ -199,7 +200,7 @@ namespace Inventory_Management_Backend.Repository
                 // Complete the query
                 var transactionsQuery = baseQuery + @"
         )
-        SELECT TransactionID, Amount, Date, Type, Status, VendorID, Name, TotalCount
+        SELECT TransactionID, Amount, Date, TypeID, Type, Status, VendorID, Name, TotalCount
         FROM TransactionCTE
         ORDER BY Date DESC
         OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";

@@ -17,7 +17,7 @@ namespace Inventory_Management_Backend.Repository
         {
             _db = db;
             _configuration = configuration;
-            
+
         }
         public async Task<ProductResponseDTO> CreateProduct(ProductRequestDTO productRequestDTO)
         {
@@ -381,7 +381,7 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task<(List<ProductSelectResponseDTO>, int itemCount)> GetProductsSelect(PaginationParams paginationParams)
+        public async Task<(List<ProductSelectResponseDTO>, int itemCount)> GetProductsSelect(int transactionTypeID, PaginationParams paginationParams)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
@@ -395,7 +395,10 @@ namespace Inventory_Management_Backend.Repository
                 p.product_id_pkey AS ProductID, 
                 p.sku AS SKU, 
                 p.product_name AS Name,  
-                p.product_cost_price AS Cost, 
+                CASE 
+                    WHEN @TransactionTypeID = 1 THEN p.product_cost_price 
+                    WHEN @TransactionTypeID = 2 THEN p.product_price 
+                END AS Cost,
                 COALESCE(i.inventory_stock, 0) AS Quantity,
                 c.category_name AS Category,
                 COUNT(*) OVER() AS TotalCount
@@ -416,7 +419,8 @@ namespace Inventory_Management_Backend.Repository
                 {
                     Offset = offset,
                     PageSize = paginationParams.PageSize,
-                    SearchQuery = paginationParams.Search
+                    SearchQuery = paginationParams.Search,
+                    TransactionTypeID = transactionTypeID
                 };
 
                 var result = await connection.QueryAsync<ProductSelectResponseDTO, long, (ProductSelectResponseDTO, long)>(
@@ -432,6 +436,7 @@ namespace Inventory_Management_Backend.Repository
                 return (products, totalCount);
             }
         }
+
 
         public async Task<ProductResponseDTO> UpdateProduct(int productID, ProductRequestDTO productRequestDTO)
         {
