@@ -9,7 +9,7 @@ using System.Net;
 namespace Inventory_Management_Backend.Controllers
 {
     [Route("api/category")]
-    [Authorize]
+    //[Authorize]
     [ApiController]
     public class CategoryController : ControllerBase
     {
@@ -23,7 +23,6 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPost]
-        [Authorize]
         [Route("get")]
         public async Task<IActionResult> GetCategories(PaginationParams paginationParams)
         {
@@ -49,7 +48,6 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpGet]
-        [Authorize]
         [Route("get/{categoryID}")]
         public async Task<IActionResult> GetCategory(int categoryID)
         {
@@ -73,7 +71,6 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPost]
-        [Authorize]
         [Route("create")]
         public async Task<IActionResult> CreateCategory(CategoryRequestDTO categoryDTO)
         {
@@ -97,7 +94,6 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpDelete]
-        [Authorize]
         [Route("delete/{categoryID}")]
         public async Task<IActionResult> DeleteCategory(int categoryID)
         {
@@ -121,7 +117,6 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPut]
-        [Authorize]
         [Route("update/{categoryID}")]
         public async Task<IActionResult> UpdateCategory(int categoryID, CategoryRequestDTO requestDTO)
         {
