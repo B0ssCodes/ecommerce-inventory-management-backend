@@ -137,6 +137,54 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
+        public async Task<CategoryProductsResponseDTO> GetCategoryProducts(int categoryID)
+        {
+            using (IDbConnection connection = _db.CreateConnection())
+            {
+                var query = @"
+            SELECT 
+                c.category_id_pkey AS CategoryID,
+                c.category_name AS CategoryName,
+                p.product_id_pkey AS ProductID,
+                p.sku AS SKU,
+                p.product_name AS Name,
+                p.product_description AS Description,
+                p.product_price AS Price,
+                p.product_cost_price AS Cost
+            FROM category c
+            LEFT JOIN product p ON c.category_id_pkey = p.category_id
+            WHERE c.category_id_pkey = @CategoryID;";
+
+                var parameters = new { CategoryID = categoryID };
+
+                var categoryDictionary = new Dictionary<int, CategoryProductsResponseDTO>();
+
+                var result = await connection.QueryAsync<CategoryProductsResponseDTO, AllProductCategoryResponseDTO, CategoryProductsResponseDTO>(
+                    query,
+                    (category, product) =>
+                    {
+                        if (!categoryDictionary.TryGetValue(category.CategoryID, out var categoryEntry))
+                        {
+                            categoryEntry = category;
+                            categoryEntry.Products = new List<AllProductCategoryResponseDTO>();
+                            categoryDictionary.Add(category.CategoryID, categoryEntry);
+                        }
+
+                        if (product != null)
+                        {
+                            categoryEntry.Products.Add(product);
+                        }
+
+                        return categoryEntry;
+                    },
+                    parameters,
+                    splitOn: "ProductID"
+                );
+
+                return categoryDictionary.Values.FirstOrDefault();
+            }
+        }
+
         public async Task UpdateCategory(int categoryID, CategoryRequestDTO requestDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())

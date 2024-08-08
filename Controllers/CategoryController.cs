@@ -70,6 +70,29 @@ namespace Inventory_Management_Backend.Controllers
             }
         }
 
+        [HttpGet]
+        [Route("getProducts/{categoryID}")]
+        public async Task<IActionResult> GetCategoryProducts(int categoryID)
+        {
+            try
+            {
+                CategoryProductsResponseDTO response = await _categoryRepository.GetCategoryProducts(categoryID);
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "Category products retrieved successfully";
+                _response.Result = response;
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                _response.Result = default;
+                return BadRequest(_response);
+            }
+        }
+
         [HttpPost]
         [Route("create")]
         public async Task<IActionResult> CreateCategory(CategoryRequestDTO categoryDTO)
