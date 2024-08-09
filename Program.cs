@@ -63,7 +63,7 @@ if (string.IsNullOrEmpty(azureStorageConnectionString))
 {
     throw new InvalidOperationException("Azure Storage connection string is not configured.");
 }
-
+builder.Services.AddLogging();
 builder.Services.AddSingleton<DapperContext>();
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<IUserRoleRepository, UserRoleRepository>();
@@ -75,6 +75,7 @@ builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
 builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
 builder.Services.AddScoped<IUserPermissionRepository, UserPermissionRepository>();
 builder.Services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
+builder.Services.AddScoped<IUserLogRepository, UserLogRepository>();
 builder.Services.AddScoped<ApiResponse>();
 builder.Services.AddMemoryCache();
 var app = builder.Build();
@@ -117,7 +118,7 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.UseAuthentication();
 app.UseAuthorization();
-
+app.UseMiddleware<UserLoggingMiddleware>();
 app.MapControllers();
 
 app.Run();
