@@ -62,41 +62,19 @@ namespace Inventory_Management_Backend.Repository
             using (IDbConnection connection = _db.CreateConnection())
             {
                 connection.Open();
-                using (var transaction = connection.BeginTransaction())
-                {
-                    try
-                    {
-                        var deletePermissionsQuery = @"
-                            DELETE FROM user_role_permission
-                            WHERE user_role_id = @RoleID";
 
-                        var deletePermissionsParameters = new { RoleID = roleId };
-                        await connection.ExecuteAsync(deletePermissionsQuery, deletePermissionsParameters, transaction);
+                var query = @"
+                    UPDATE user_role
+                    SET deleted = true
+                    WHERE user_role_id_pkey = @RoleID;";
 
-                        var deleteUserQuery = @"
-                        DELETE FROM user_info
-                        WHERE user_role_id = @RoleID;";
-
-                        var deleteUserParameters = new { RoleID = roleId };
-                        await connection.ExecuteAsync(deleteUserQuery, deleteUserParameters, transaction);
-
-                        var deleteUserRoleQuery = @"
-                            DELETE FROM user_role 
-                            WHERE user_role_id_pkey = @RoleID";
-
-                        var deleteUserRoleParameters = new { RoleID = roleId };
-                        await connection.ExecuteAsync(deleteUserRoleQuery, deleteUserRoleParameters, transaction);
-
-                       
-
-                        transaction.Commit();
-                    }
-                    catch(Exception ex)
-                    {
-                        transaction.Rollback();
-                    }
-                }
-                    
+                var userQuery = @"
+                    UPDATE user_info
+                    SET deleted = true
+                    WHERE user_role_id = @RoleID;";
+                var parameters = new { RoleID = roleId }; 
+                await connection.ExecuteAsync(userQuery, parameters);
+                await connection.ExecuteAsync(query, parameters);
             }
         }
 

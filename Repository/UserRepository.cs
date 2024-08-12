@@ -22,7 +22,10 @@ namespace Inventory_Management_Backend.Repository
             {
                 connection.Open();
 
-                var query = "DELETE FROM user_info WHERE user_id_pkey = @UserID";
+                var query = @"
+                    UPDATE user_info
+                    SET deleted = true
+                    WHERE user_role_id_pkey = @UserID";
 
                 await connection.ExecuteAsync(query, new { UserID = userID });
 

@@ -10,10 +10,11 @@ namespace Inventory_Management_Backend.Repository
     public class CategoryRepository : ICategoryRepository
     {
         private readonly DapperContext _db;
-
-        public CategoryRepository(DapperContext db)
+        private readonly IProductRepository _productRepository;
+        public CategoryRepository(DapperContext db, IProductRepository productRepository)
         {
             _db = db;
+            _productRepository = productRepository;
         }
 
         public async Task CreateCategory(CategoryRequestDTO categoryDTO)
@@ -32,39 +33,21 @@ namespace Inventory_Management_Backend.Repository
             using (IDbConnection connection = _db.CreateConnection())
             {
                 connection.Open();
-                using (var transaction = connection.BeginTransaction())
-                {
 
-                    // Get the list of product IDs related to the category
-                    var getProductIdsQuery = "SELECT product_id_pkey FROM product WHERE category_id = @CategoryID;";
-                    var productIds = await connection.QueryAsync<int>(getProductIdsQuery, new { CategoryID = categoryID }, transaction);
+                var query = @"
+                    UPDATE category
+                    SET deleted = true
+                    WHERE category_id_pkey = @CategoryID;";
 
-                    // Delete related images from the database
-                    var deleteImagesQuery = "DELETE FROM image WHERE product_id = @ProductID;";
-                    foreach (var productId in productIds)
-                    {
-                        await connection.ExecuteAsync(deleteImagesQuery, new { ProductID = productId }, transaction);
+                var parameters = new { CategoryID = categoryID };
 
-                        // Delete the image folders
-                        var imageFolderPath = Path.Combine("ProductImages", productId.ToString());
-                        if (Directory.Exists(imageFolderPath))
-                        {
-                            Directory.Delete(imageFolderPath, true);
-                            Console.WriteLine($"Deleted image folder for product ID: {productId}");
-                        }
-                    }
+                var productQuery = @"
+                    UPDATE product
+                    SET deleted = true
+                    WHERE category_id = @CategoryID;";
 
-                    // Delete related products
-                    var deleteProductsQuery = "DELETE FROM product WHERE category_id = @CategoryID;";
-                    await connection.ExecuteAsync(deleteProductsQuery, new { CategoryID = categoryID }, transaction);
-
-                    // Delete the category
-                    var deleteCategoryQuery = "DELETE FROM category WHERE category_id_pkey = @CategoryID;";
-                    await connection.ExecuteAsync(deleteCategoryQuery, new { CategoryID = categoryID }, transaction);
-
-                    transaction.Commit();
-
-                }
+                await connection.QuerySingleOrDefaultAsync(productQuery, parameters);
+                await connection.QuerySingleOrDefaultAsync(query, parameters);
             }
         }
 

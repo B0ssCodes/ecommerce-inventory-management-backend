@@ -168,92 +168,17 @@ namespace Inventory_Management_Backend.Repository
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
-                connection.Open(); // Explicitly open the connection
+                connection.Open();
 
-                using (IDbTransaction transaction = connection.BeginTransaction())
-                {
-                    try
-                    {
-                        // Check if the product exists before deleting it
-                        var checkProductQuery = @"
-                SELECT EXISTS (
-                    SELECT 1
-                    FROM product
-                    WHERE product_id_pkey = @ProductID
-                )";
+                var query = @"
+                    UPDATE product
+                    SET deleted = true
+                    WHERE product_id_pkey = @ProductID;";
 
-                        var productExists = await connection.ExecuteScalarAsync<bool>(checkProductQuery, new { ProductID = productID }, transaction);
-                        if (!productExists)
-                        {
-                            throw new Exception("Product not found");
-                        }
+                var parameters = new { ProductID = productID };
 
-                        // Fetch existing images to delete them from the local directory
-                        var fetchExistingImagesQuery = @"
-                SELECT image_url AS Url
-                FROM image
-                WHERE product_id = @ProductID";
-
-                        var existingImages = (await connection.QueryAsync<string>(fetchExistingImagesQuery, new { ProductID = productID }, transaction)).ToList();
-
-                        // Delete existing images from the database
-                        var deleteImagesQuery = @"
-                DELETE FROM image
-                WHERE product_id = @ProductID";
-
-                        await connection.ExecuteAsync(deleteImagesQuery, new { ProductID = productID }, transaction);
-
-                        var deleteTransactionItemsQuery = @"
-                            DELETE FROM transaction_item
-                            WHERE product_id = @ProductID;";
-
-                        var parameters = new { ProductID = productID };
-
-                        await connection.ExecuteAsync(deleteTransactionItemsQuery, parameters, transaction);
-
-                        var deleteInventoryQuery = @"
-                            DELETE FROM inventory
-                            WHERE product_id = @ProductID;";
-
-                        var inventoryParameters = new { ProductID = productID };
-
-                        await connection.ExecuteAsync(deleteInventoryQuery, inventoryParameters, transaction);
-
-                        // Delete the product
-                        var deleteProductQuery = @"
-                DELETE FROM product
-                WHERE product_id_pkey = @ProductID";
-
-                        await connection.ExecuteAsync(deleteProductQuery, new { ProductID = productID }, transaction);
-
-                        // Commit the transaction when done
-                        transaction.Commit();
-
-                        // Get the images directory from the configuration
-                        var imagesDirectory = _configuration["ImagesDirectory"];
-                        if (string.IsNullOrEmpty(imagesDirectory))
-                        {
-                            throw new Exception("Images directory is not configured.");
-                        }
-
-                        // Construct the product directory using the productID
-                        var productDirectory = Path.Combine(imagesDirectory, productID.ToString());
-
-                        // Delete the product directory and all its contents
-                        if (Directory.Exists(productDirectory))
-                        {
-                            Directory.Delete(productDirectory, true);
-                        }
-
-                        return true;
-                    }
-                    catch
-                    {
-                        // Rollback the transaction if any error occurs
-                        transaction.Rollback();
-                        throw;
-                    }
-                }
+                await connection.QueryFirstOrDefaultAsync(query, parameters);
+                return true;
             }
         }
 

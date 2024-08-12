@@ -49,10 +49,16 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public Task<UserLogResponseDTO> GetUserLog(int id)
-        {
-            throw new NotImplementedException();
-        }
+        //public Task<UserLogResponseDTO> GetUserLog(int id)
+        //{
+        //    using (IDbConnection connection = _db.CreateConnection())
+        //    {
+        //        connection.Open();
+
+        //        var query = @"
+        //            SELECT ;";
+        //    }
+        //}
 
         public Task<List<UserLogResponseDTO>> GetUserLogs(PaginationParams paginationParams)
         {

@@ -71,8 +71,9 @@ namespace Inventory_Management_Backend.Repository
                 }
 
                 var transactionDeleteQuery = @"
-                    DELETE FROM transaction
-                    WHERE transaction_id_pkey = @TransactionID;";
+                    UPDATE transaction
+                    SET deleted = true
+                    WHERE transaction_id_pkey = @TransactionID";
 
                 await connection.ExecuteAsync(transactionDeleteQuery, transactionStatusParameters);
                 

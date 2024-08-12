@@ -46,7 +46,8 @@ namespace Inventory_Management_Backend.Repository
                 connection.Open();
 
                 var query = @"
-                DELETE FROM vendor
+                UPDATE vendor
+                SET deleted = true
                 WHERE vendor_id_pkey = @VendorID;";
 
                 var parameters = new
@@ -68,7 +69,7 @@ namespace Inventory_Management_Backend.Repository
                 SELECT vendor_id_pkey AS VendorID, vendor_name AS Name, vendor_email AS Email,
                        vendor_phone_number AS Phone, vendor_commercial_phone AS CommercialPhone, vendor_address AS Address
                 FROM vendor
-                WHERE vendor_id_pkey = @VendorID;";
+                WHERE vendor_id_pkey = @VendorID AND deleted = false;";
 
                 var parameters = new
                 {
@@ -111,7 +112,8 @@ namespace Inventory_Management_Backend.Repository
                    vendor_email ILIKE '%' || @SearchQuery || '%' OR 
                    vendor_phone_number ILIKE '%' || @SearchQuery || '%' OR 
                    vendor_commercial_phone ILIKE '%' || @SearchQuery || '%' OR 
-                   vendor_address ILIKE '%' || @SearchQuery || '%')
+                   vendor_address ILIKE '%' || @SearchQuery || '%') 
+            AND deleted = false    
         )
         SELECT VendorID, Name, Email, Phone, CommercialPhone, Address, VendorCount
         FROM VendorCTE
