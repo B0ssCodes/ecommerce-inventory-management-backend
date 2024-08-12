@@ -4,6 +4,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text;
+using Microsoft.Net.Http.Headers;
 
 public class UserLoggingMiddleware
 {
@@ -40,71 +41,109 @@ public class UserLoggingMiddleware
             var userRoleRepository = scope.ServiceProvider.GetRequiredService<IUserRoleRepository>();
             var vendorRepository = scope.ServiceProvider.GetRequiredService<IVendorRepository>();
 
-            if ((action == "update" || action == "create") && model == "product")
+            if (model == "product")
             {
-                beforeStateJson = JsonSerializer.Serialize(new { product = "created" });
-
-                // Read the request body
-                using (var reader = new StreamReader(httpContext.Request.Body, Encoding.UTF8, leaveOpen: true))
+                if (action == "create")
                 {
-                    requestJson = await reader.ReadToEndAsync();
-                    _logger.LogInformation("Request Body: {Body}", requestJson);
+                    beforeStateJson = JsonSerializer.Serialize(new ProductRequestDTO());
+                }
+                else if (action == "update")
+                {
+                    id = int.Parse(pathSegments[3]);
+                    beforeStateJson = JsonSerializer.Serialize(await productRepository.GetProduct(id));
+                }
+            }
+            else if ((action == "create" || action == "submit") && model != "product")
+            {
+                switch (model)
+                {
+                    case "category":
+                        beforeStateJson = JsonSerializer.Serialize(new CategoryRequestDTO());
+                        break;
+                    case "transaction":
+                        beforeStateJson = JsonSerializer.Serialize(new TransactionCreateDTO());
+                        break;
+                    case "userRole":
+                        beforeStateJson = JsonSerializer.Serialize(new UserRoleRequestDTO());
+                        break;
+                    case "vendor":
+                        beforeStateJson = JsonSerializer.Serialize(new VendorRequestDTO());
+                        break;
+                    default:
+                        beforeStateJson = JsonSerializer.Serialize(new { item = "created" });
+                        break;
+                }
+
+                using (var stream = new StreamReader(httpContext.Request.Body, Encoding.UTF8, leaveOpen: true))
+                {
+                    afterStateJson = await stream.ReadToEndAsync();
                     httpContext.Request.Body.Position = 0;
                 }
             }
-            else if ((action == "update" || action == "delete") && pathSegments.Length > 3 && int.TryParse(pathSegments[3], out id))
+            else if ((action == "update" && model != "product"))
             {
-                if (model != "product")
+                id = int.Parse(pathSegments[3]);
+                switch (model)
                 {
-                    object beforeState = null;
-                    switch (model)
-                    {
-                        case "category":
-                            beforeState = await categoryRepository.GetCategory(id);
-                            break;
-                        case "user":
-                            beforeState = await userRepository.GetUser(id);
-                            break;
-                        case "userRole":
-                            beforeState = await userRoleRepository.GetUserRole(id);
-                            break;
-                        case "vendor":
-                            beforeState = await vendorRepository.GetVendor(id);
-                            break;
-                    }
+                    case "category":
+                        beforeStateJson = JsonSerializer.Serialize(await categoryRepository.GetCategory(id));
+                        break;
+                    case "user":
+                        beforeStateJson = JsonSerializer.Serialize(await userRepository.GetUser(id));
+                        break;
+                    case "userRole":
+                        beforeStateJson = JsonSerializer.Serialize(await userRoleRepository.GetUserRole(id));
+                        break;
+                    case "vendor":
+                        beforeStateJson = JsonSerializer.Serialize(await vendorRepository.GetVendor(id));
+                        break;
+                    default:
+                        beforeStateJson = JsonSerializer.Serialize(new { item = "updated" });
+                        break;
+                }
 
-                    // Convert beforeState object to JSON string
-                    beforeStateJson = JsonSerializer.Serialize(beforeState);
-
-                    // Read the request body
-                    using (var reader = new StreamReader(httpContext.Request.Body, Encoding.UTF8, leaveOpen: true))
-                    {
-                        requestJson = await reader.ReadToEndAsync();
-                        _logger.LogInformation("Request Body: {Body}", requestJson);
-                        httpContext.Request.Body.Position = 0;
-                    }
-
-                    afterStateJson = requestJson;
+                using (var stream = new StreamReader(httpContext.Request.Body, Encoding.UTF8, leaveOpen: true))
+                {
+                    afterStateJson = await stream.ReadToEndAsync();
+                    httpContext.Request.Body.Position = 0;
+                }
+            }
+            else if (action == "delete")
+            {
+                id = int.Parse(pathSegments[3]);
+                switch (model)
+                {
+                    case "category":
+                        beforeStateJson = JsonSerializer.Serialize(await categoryRepository.GetCategory(id));
+                        break;
+                    case "user":
+                        beforeStateJson = JsonSerializer.Serialize(await userRepository.GetUser(id));
+                        break;
+                    case "userRole":
+                        beforeStateJson = JsonSerializer.Serialize(await userRoleRepository.GetUserRole(id));
+                        break;
+                    case "vendor":
+                        beforeStateJson = JsonSerializer.Serialize(await vendorRepository.GetVendor(id));
+                        break;
+                    default:
+                        beforeStateJson = JsonSerializer.Serialize(new { item = "updated" });
+                        break;
                 }
             }
             else
             {
-                using (var reader = new StreamReader(httpContext.Request.Body, Encoding.UTF8, leaveOpen: true))
+                using (var stream = new StreamReader(httpContext.Request.Body, Encoding.UTF8, leaveOpen: true))
                 {
-                    requestJson = await reader.ReadToEndAsync();
-                    _logger.LogInformation("Request Body: {Body}", requestJson);
+                    beforeStateJson = await stream.ReadToEndAsync();
                     httpContext.Request.Body.Position = 0;
                 }
-
-                beforeStateJson = requestJson;
             }
 
-            // Retrieve and log the Authorization header
             int userId = 0;
             string token = httpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
             if (!string.IsNullOrWhiteSpace(token))
             {
-                // Extract user ID from the token
+                // Get the user ID from the passed JWT Token
                 var handler = new JwtSecurityTokenHandler();
                 var jwtToken = handler.ReadJwtToken(token);
                 string userIdString = jwtToken.Claims.FirstOrDefault(claim => claim.Type == ClaimTypes.NameIdentifier)?.Value;
@@ -113,50 +152,56 @@ public class UserLoggingMiddleware
                 if (!int.TryParse(userIdString, out userId))
                 {
                     _logger.LogError("Invalid User ID: {UserIdString}", userIdString);
-                    // Handle the error as needed, e.g., return a response or throw an exception
                 }
             }
 
-            // Capture the response body
+            // Get the response body
             var originalResponseBodyStream = httpContext.Response.Body;
             using (var responseBodyStream = new MemoryStream())
             {
                 httpContext.Response.Body = responseBodyStream;
 
-                // Process the request
-                await _next(httpContext);
-
-                // Read and log the response body
-                responseBodyStream.Seek(0, SeekOrigin.Begin);
-                var responseBody = await new StreamReader(responseBodyStream).ReadToEndAsync();
-                responseBodyStream.Seek(0, SeekOrigin.Begin);
-
-                if (action == "update" || action == "create")
+                try
                 {
-                    afterStateJson = responseBody;
+                    // Process the request then get the response body
+                    await _next(httpContext);
+
+                    responseBodyStream.Seek(0, SeekOrigin.Begin);
+                    var responseBody = await new StreamReader(responseBodyStream).ReadToEndAsync();
+                    responseBodyStream.Seek(0, SeekOrigin.Begin);
+
+                    if (action != "create" && action != "update")
+                    {
+                        afterStateJson = responseBody;
+                    }
+
+                    string dateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    string logName = $"{model} {action} by {userId} / {dateTime} ";
+                    UserLogRequestDTO requestDTO = new UserLogRequestDTO
+                    {
+                        UserID = userId,
+                        LogName = logName,
+                        Action = action,
+                        Model = model,
+                        BeforeState = beforeStateJson,
+                        AfterState = afterStateJson,
+                    };
+
+                    // Call the createUserLog method with request and response bodies
+                    await userLogRepository.CreateUserLog(requestDTO);
+
+                    // Copy the response body back to the original stream
+                    await responseBodyStream.CopyToAsync(originalResponseBodyStream);
                 }
-                else if (action != "update" && action != "delete")
+                catch (Exception ex)
                 {
-                    afterStateJson = responseBody;
+                    _logger.LogError(ex, "An error occurred while processing the request.");
+                    throw;
                 }
-
-                string dateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                string logName = $"{model} {action} by {userId} / {dateTime} ";
-                UserLogRequestDTO requestDTO = new UserLogRequestDTO
+                finally
                 {
-                    UserID = userId,
-                    LogName = logName,
-                    Action = action,
-                    Model = model,
-                    BeforeState = beforeStateJson,
-                    AfterState = afterStateJson,
-                };
-
-                // Call the createUserLog method with request and response bodies
-                await userLogRepository.CreateUserLog(requestDTO);
-
-                // Copy the response body back to the original stream
-                await responseBodyStream.CopyToAsync(originalResponseBodyStream);
+                    httpContext.Response.Body = originalResponseBodyStream;
+                }
             }
         }
     }

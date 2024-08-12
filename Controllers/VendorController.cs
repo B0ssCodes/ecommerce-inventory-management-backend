@@ -9,7 +9,7 @@ using System.Net;
 namespace Inventory_Management_Backend.Controllers
 {
     [Route("api/vendor")]
-    [Authorize]
+    //[Authorize]
     [ApiController]
     public class VendorController : ControllerBase
     {
@@ -23,7 +23,6 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPost]
-        [Authorize]
         [Route("get")]
         public async Task<IActionResult> GetVendors(PaginationParams paginationParams)
         {
@@ -48,7 +47,6 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpGet]
-        [Authorize]
         [Route("get/{vendorID}")]
         public async Task<IActionResult> GetVendor(int vendorID)
         {
@@ -72,7 +70,6 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPost]
-        [Authorize]
         [Route("create")]
         public async Task<IActionResult> CreateVendor(VendorRequestDTO vendorRequestDTO)
         {
@@ -96,7 +93,6 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPut]
-        [Authorize]
         [Route("update/{vendorID}")]
         public async Task<IActionResult> UpdateVendor(int vendorID, VendorRequestDTO vendorRequestDTO)
         {
@@ -120,7 +116,6 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpDelete]
-        [Authorize]
         [Route("delete/{vendorID}")]
         public async Task<IActionResult> DeleteVendor(int vendorID)
         {
