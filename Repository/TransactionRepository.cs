@@ -190,7 +190,9 @@ namespace Inventory_Management_Backend.Repository
                    t.transaction_date::TEXT ILIKE '%' || @Search || '%' OR
                    tt.type ILIKE '%' || @Search || '%' OR
                    ts.status ILIKE '%' || @Search || '%' OR
-                   v.vendor_name ILIKE '%' || @Search || '%')";
+                   v.vendor_name ILIKE '%' || @Search || '%')
+            AND t.deleted = false
+          ";
 
                 // Add vendor ID conditionally
                 if (vendorEmail != null)

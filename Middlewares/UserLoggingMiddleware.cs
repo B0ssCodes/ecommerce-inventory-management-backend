@@ -21,12 +21,18 @@ public class UserLoggingMiddleware
 
     public async Task InvokeAsync(HttpContext httpContext)
     {
+        
         httpContext.Request.EnableBuffering();
 
         var pathSegments = httpContext.Request.Path.Value.Split('/', StringSplitOptions.RemoveEmptyEntries);
         string action = pathSegments.Length > 2 ? pathSegments[2] : "Unknown";
         string model = pathSegments.Length > 1 ? pathSegments[1] : "Unknown";
 
+        if (action == "login")
+        {
+            await _next(httpContext);
+            return;
+        }
         int id = 0;
         string requestJson = null;
         string beforeStateJson = null;
@@ -41,17 +47,21 @@ public class UserLoggingMiddleware
             var userRoleRepository = scope.ServiceProvider.GetRequiredService<IUserRoleRepository>();
             var vendorRepository = scope.ServiceProvider.GetRequiredService<IVendorRepository>();
 
-            if (model == "product")
+            if (model == "product" && action == "create")
             {
-                if (action == "create")
-                {
-                    beforeStateJson = JsonSerializer.Serialize(new ProductRequestDTO());
-                }
-                else if (action == "update")
-                {
-                    id = int.Parse(pathSegments[3]);
-                    beforeStateJson = JsonSerializer.Serialize(await productRepository.GetProduct(id));
-                }
+              
+                beforeStateJson = JsonSerializer.Serialize(new ProductRequestDTO());
+                
+               
+            }
+            else if (model == "product" && action == "update")
+            {
+                id = int.Parse(pathSegments[3]);
+                beforeStateJson = JsonSerializer.Serialize(await productRepository.GetProduct(id));
+            }
+            else if (model == "analytics")
+            {
+                beforeStateJson = JsonSerializer.Serialize(new { analytics = $"{action}" });
             }
             else if ((action == "create" || action == "submit") && model != "product")
             {
@@ -185,7 +195,7 @@ public class UserLoggingMiddleware
                     }
 
                     string dateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                    string logName = $"{model} {action} by {userId} / {dateTime} ";
+                    string logName = $"{model} {action} by {userId} : {dateTime} ";
                     UserLogRequestDTO requestDTO = new UserLogRequestDTO
                     {
                         UserID = userId,

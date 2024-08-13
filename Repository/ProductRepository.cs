@@ -260,6 +260,7 @@ namespace Inventory_Management_Backend.Repository
             WHERE (@SearchQuery IS NULL OR p.product_name ILIKE '%' || @SearchQuery || '%' 
                    OR p.product_description ILIKE '%' || @SearchQuery || '%' 
                    OR p.sku ILIKE '%' || @SearchQuery || '%')
+            AND deleted = false
         )
         SELECT ProductID, SKU, Name, Description, Price, Cost, CategoryID, ImageCount, TotalCount
         FROM ProductCTE
@@ -333,6 +334,7 @@ namespace Inventory_Management_Backend.Repository
             WHERE (@SearchQuery IS NULL OR p.product_name ILIKE '%' || @SearchQuery || '%' 
                    OR p.product_description ILIKE '%' || @SearchQuery || '%' 
                    OR p.sku ILIKE '%' || @SearchQuery || '%')
+               AND p.deleted = false
         )
         SELECT ProductID, SKU, Name, Cost, Quantity, Category, TotalCount
         FROM ProductCTE

@@ -24,14 +24,15 @@ namespace Inventory_Management_Backend.Repository
             using (IDbConnection connection = _db.CreateConnection())
             {
                 var query = @"
-            INSERT INTO user_log (user_log_name, user_log_action, user_log_model, before_state, after_state)
-            VALUES (@LogName, @Action, @Model, @BeforeState::jsonb, @AfterState::jsonb);";
+            INSERT INTO user_log (user_log_name, user_log_action, user_log_model, user_info_id, before_state, after_state)
+            VALUES (@LogName, @Action, @Model, @UserID, @BeforeState::jsonb, @AfterState::jsonb);";
 
                 var parameters = new
                 {
                     LogName = requestDTO.LogName,
                     Action = requestDTO.Action,
                     Model = requestDTO.Model,
+                    UserID = requestDTO.UserID,
                     BeforeState = requestDTO.BeforeState,
                     AfterState =requestDTO.AfterState,
                 };
@@ -52,6 +53,7 @@ namespace Inventory_Management_Backend.Repository
                    user_log_name AS LogName,
                    user_log_action AS Action,
                    user_log_model AS Model,
+                   user_info_id AS UserID,
                    before_state AS BeforeState,
                    after_state AS AfterState
             FROM user_log
@@ -84,7 +86,8 @@ namespace Inventory_Management_Backend.Repository
                             user_log_id_pkey AS LogID,
                             user_log_name AS LogName,
                             user_log_action AS Action,
-                            user_log_model AS Model
+                            user_log_model AS Model,
+                            user_info_id AS UserID
                         FROM user_log
                         WHERE (@SearchQuery IS NULL OR 
                                user_log_name ILIKE '%' || @SearchQuery || '%' OR 
@@ -97,6 +100,7 @@ namespace Inventory_Management_Backend.Repository
                         LogName, 
                         Action, 
                         Model,
+                        UserID, 
                         COUNT(*) OVER() AS TotalCount
                     FROM FilteredLogs
                     ORDER BY LogID DESC

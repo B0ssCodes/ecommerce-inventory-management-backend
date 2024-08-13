@@ -6,5 +6,6 @@
         public string LogName { get; set; }
         public string Action { get; set; }
         public string Model { get; set; }
+        public int UserID { get; set; }
     }
 }

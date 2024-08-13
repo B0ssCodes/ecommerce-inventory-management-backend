@@ -8,6 +8,7 @@ namespace Inventory_Management_Backend.Models.Dto
         public string LogName { get; set; }
         public string Action { get; set; }
         public string Model { get; set; }
+        public int UserID { get; set; }
         public JsonElement BeforeState { get; set; }
         public JsonElement AfterState { get; set; }
     }
