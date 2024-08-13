@@ -130,6 +130,15 @@ public class UserLoggingMiddleware
                         break;
                 }
             }
+            else if (action == "get" && pathSegments.Length > 3)
+            {
+                 id = int.Parse(pathSegments[3]);
+                 
+                if (id != 0)
+                {
+                    beforeStateJson = JsonSerializer.Serialize(new { requested = $"{model} with id {id}"});
+                }
+            }
             else
             {
                 using (var stream = new StreamReader(httpContext.Request.Body, Encoding.UTF8, leaveOpen: true))

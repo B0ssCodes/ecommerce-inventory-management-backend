@@ -78,6 +78,9 @@ builder.Services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
 builder.Services.AddScoped<IUserLogRepository, UserLogRepository>();
 builder.Services.AddScoped<ApiResponse>();
 builder.Services.AddMemoryCache();
+
+Inventory_Management_Backend.Utilities.JsonHandler.Initialize();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

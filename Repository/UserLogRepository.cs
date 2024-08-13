@@ -12,57 +12,116 @@ namespace Inventory_Management_Backend.Repository
     public class UserLogRepository : IUserLogRepository
     {
         private readonly DapperContext _db;
-        private readonly ILogger<UserLogRepository> _logger;
 
         public UserLogRepository(DapperContext db, ILogger<UserLogRepository> logger)
         {
             _db = db;
-            _logger = logger;
         }
 
         public async Task CreateUserLog(UserLogRequestDTO requestDTO)
         {
-            try
+
+            using (IDbConnection connection = _db.CreateConnection())
             {
-                using (IDbConnection connection = _db.CreateConnection())
-                {
-                    var query = @"
+                var query = @"
             INSERT INTO user_log (user_log_name, user_log_action, user_log_model, before_state, after_state)
             VALUES (@LogName, @Action, @Model, @BeforeState::jsonb, @AfterState::jsonb);";
 
-                    var parameters = new
-                    {
-                        LogName = requestDTO.LogName,
-                        Action = requestDTO.Action,
-                        Model = requestDTO.Model,
-                        BeforeState = JsonSerializer.Serialize(requestDTO.BeforeState),
-                        AfterState = JsonSerializer.Serialize(requestDTO.AfterState),
-                    };
+                var parameters = new
+                {
+                    LogName = requestDTO.LogName,
+                    Action = requestDTO.Action,
+                    Model = requestDTO.Model,
+                    BeforeState = requestDTO.BeforeState,
+                    AfterState =requestDTO.AfterState,
+                };
 
-                    await connection.ExecuteAsync(query, parameters);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "An error occurred while creating the user log.");
-                throw;
+                await connection.ExecuteAsync(query, parameters);
             }
         }
 
-        //public Task<UserLogResponseDTO> GetUserLog(int id)
-        //{
-        //    using (IDbConnection connection = _db.CreateConnection())
-        //    {
-        //        connection.Open();
 
-        //        var query = @"
-        //            SELECT ;";
-        //    }
-        //}
-
-        public Task<List<UserLogResponseDTO>> GetUserLogs(PaginationParams paginationParams)
+        public async Task<UserLogResponseDTO> GetUserLog(int id)
         {
-            throw new NotImplementedException();
+            using (IDbConnection connection = _db.CreateConnection())
+            {
+                connection.Open();
+
+                var query = @"
+            SELECT user_log_id_pkey AS LogID,
+                   user_log_name AS LogName,
+                   user_log_action AS Action,
+                   user_log_model AS Model,
+                   before_state AS BeforeState,
+                   after_state AS AfterState
+            FROM user_log
+            WHERE user_log_id_pkey = @LogID;";
+
+                var parameters = new { LogID = id };
+                var result = await connection.QueryFirstOrDefaultAsync<UserLogResponseDTO>(query, parameters);
+
+                if (result == null)
+                {
+                    throw new Exception("User log not found.");
+                }
+
+                return result;
+            }
+        }
+
+        public async Task<(List<AllUserLogResponseDTO>, int)> GetUserLogs(PaginationParams paginationParams)
+        {
+            using (IDbConnection connection = _db.CreateConnection())
+            {
+                connection.Open();
+
+                var offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
+                var searchQuery = paginationParams.Search;
+
+                var query = @"
+                    WITH FilteredLogs AS (
+                        SELECT 
+                            user_log_id_pkey AS LogID,
+                            user_log_name AS LogName,
+                            user_log_action AS Action,
+                            user_log_model AS Model
+                        FROM user_log
+                        WHERE (@SearchQuery IS NULL OR 
+                               user_log_name ILIKE '%' || @SearchQuery || '%' OR 
+                               user_log_action ILIKE '%' || @SearchQuery || '%' OR 
+                               user_log_model ILIKE '%' || @SearchQuery || '%')
+                       
+                    )
+                    SELECT 
+                        LogID, 
+                        LogName, 
+                        Action, 
+                        Model,
+                        COUNT(*) OVER() AS TotalCount
+                    FROM FilteredLogs
+                    ORDER BY LogID DESC
+                    OFFSET @Offset ROWS
+                    FETCH NEXT @PageSize ROWS ONLY;";
+
+                var parameters = new
+                {
+                    Offset = offset,
+                    PageSize = paginationParams.PageSize,
+                    SearchQuery = searchQuery
+                };
+
+                var result = await connection.QueryAsync<AllUserLogResponseDTO, long, (AllUserLogResponseDTO, long)>(
+                    query,
+                    (log, totalCount) => (log, totalCount),
+                    parameters,
+                    splitOn: "TotalCount"
+                );
+
+                var logs = result.Select(r => r.Item1).ToList();
+                int totalCount = result.Any() ? (int)result.First().Item2 : 0;
+
+                return (logs, totalCount);
+            }
         }
     }
 }
