@@ -170,14 +170,28 @@ namespace Inventory_Management_Backend.Repository
             {
                 connection.Open();
 
-                var query = @"
-                    UPDATE product
-                    SET deleted = true
-                    WHERE product_id_pkey = @ProductID;";
+                var checkInventoryQuery = @"
+            SELECT EXISTS (
+                SELECT 1
+                FROM inventory
+                WHERE product_id = @ProductID
+            )";
+
+                var inventoryExists = await connection.ExecuteScalarAsync<bool>(checkInventoryQuery, new { ProductID = productID });
+
+                if (inventoryExists)
+                {
+                    throw new Exception("This product is still in stock, please empty the stock to delete it!");
+                }
+
+                var deleteQuery = @"
+            UPDATE product
+            SET deleted = true
+            WHERE product_id_pkey = @ProductID;";
 
                 var parameters = new { ProductID = productID };
 
-                await connection.QueryFirstOrDefaultAsync(query, parameters);
+                await connection.QueryFirstOrDefaultAsync(deleteQuery, parameters);
                 return true;
             }
         }

@@ -21,7 +21,6 @@ public class UserLoggingMiddleware
 
     public async Task InvokeAsync(HttpContext httpContext)
     {
-        
         httpContext.Request.EnableBuffering();
 
         var pathSegments = httpContext.Request.Path.Value.Split('/', StringSplitOptions.RemoveEmptyEntries);
@@ -49,10 +48,7 @@ public class UserLoggingMiddleware
 
             if (model == "product" && action == "create")
             {
-              
                 beforeStateJson = JsonSerializer.Serialize(new ProductRequestDTO());
-                
-               
             }
             else if (model == "product" && action == "update")
             {
@@ -140,13 +136,11 @@ public class UserLoggingMiddleware
                         break;
                 }
             }
-            else if (action == "get" && pathSegments.Length > 3)
+            else if (action.StartsWith("get", StringComparison.OrdinalIgnoreCase) && pathSegments.Length > 3)
             {
-                 id = int.Parse(pathSegments[3]);
-                 
-                if (id != 0)
+                if (int.TryParse(pathSegments[3], out id) && id != 0)
                 {
-                    beforeStateJson = JsonSerializer.Serialize(new { requested = $"{model} with id {id}"});
+                    beforeStateJson = JsonSerializer.Serialize(new { requested = $"{model} with id {id}" });
                 }
             }
             else

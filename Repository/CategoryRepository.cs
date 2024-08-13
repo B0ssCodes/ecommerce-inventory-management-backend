@@ -136,7 +136,7 @@ namespace Inventory_Management_Backend.Repository
                 p.product_cost_price AS Cost
             FROM category c
             LEFT JOIN product p ON c.category_id_pkey = p.category_id
-            WHERE c.category_id_pkey = @CategoryID;";
+            WHERE c.category_id_pkey = @CategoryID AND p.deleted = false;";
 
                 var parameters = new { CategoryID = categoryID };
 
