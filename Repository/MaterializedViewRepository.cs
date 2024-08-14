@@ -27,7 +27,8 @@ namespace Inventory_Management_Backend.Repository
                 var viewExists = await connection.ExecuteScalarAsync<bool>(checkViewQuery);
 
                 // If the materialized view already exists just return, else create it.
-                if (viewExists) {
+                if (viewExists)
+                {
                     return;
                 }
                 else
@@ -147,6 +148,76 @@ namespace Inventory_Management_Backend.Repository
                     await connection.ExecuteAsync(createViewQuery);
                 }
 
+            }
+        }
+
+        public async Task RefreshAndPaginateProduct()
+        {
+            using (IDbConnection connection = _db.CreateConnection())
+            {
+                connection.Open();
+
+                using (IDbTransaction transaction = connection.BeginTransaction())
+                {
+                    var getTotalProductsQuery = "SELECT COUNT(product_id_pkey) FROM product";
+
+                    int totalProducts = await connection.ExecuteScalarAsync<int>(getTotalProductsQuery, transaction);
+
+                    int pageSize = 20;
+
+                    int totalPages = (int)Math.Ceiling((double)totalProducts / pageSize);
+
+                    for (int i = 0; i < totalPages; i++)
+                    {
+                        int offset = i * pageSize;
+                        string pageName = $"mv_product_{i + 1}";
+
+                        // product_page_1
+                        // product_page_2
+                        // product_page_3
+
+                        // Product start at page 1 and we are sorting by product_id descending, so page 1 will have the latest products
+
+                        var checkViewExistsQuery = $"SELECT EXISTS (SELECT 1 FROM pg_matviews WHERE matviewname = @PageName)";
+
+                        var existsParameters = new { PageName = pageName };
+
+                        var viewExists = await connection.ExecuteScalarAsync<bool>(checkViewExistsQuery, existsParameters, transaction);
+                        if (viewExists)
+                        {
+                            var refreshViewQuery = $"REFRESH MATERIALIZED VIEW {pageName}";
+                            await connection.ExecuteAsync(refreshViewQuery);
+                        }
+                        else
+                        {
+                            var createViewQuery = $@"
+                                CREATE MATERIALIZED VIEW @PageName
+                                AS
+                                SELECT 
+                                    p.product_id_pkey AS product_id_pkey, 
+                                    p.sku AS sku, 
+                                    p.product_name AS product_name, 
+                                    p.product_description AS product_description, 
+                                    p.product_price AS product_price, 
+                                    p.product_cost_price AS product_cost, 
+                                    c.category_id AS category_id,
+                                    c.category_name AS category_name,    
+                                    (SELECT COUNT(image_id_pkey) FROM image WHERE product_id = p.product_id_pkey) AS ImageCount,
+                                FROM product p
+                                JOIN category c ON p.category_id = c.category_id_pkey
+                                WHERE (@SearchQuery IS NULL OR p.product_name ILIKE '%' || @SearchQuery || '%' 
+                                       OR p.product_description ILIKE '%' || @SearchQuery || '%' 
+                                       OR p.sku ILIKE '%' || @SearchQuery || '%')
+                                AND deleted = false 
+                                ORDER BY p.product_id_pkey DESC
+                                LIMIT @PageSize OFFSET @Offset";
+
+                            var createParameters = new { PageName = pageName, SearchQuery = "", PageSize = pageSize, Offset = offset };
+
+                            await connection.ExecuteAsync(createViewQuery, createParameters);
+                        }
+                    }
+                }
             }
         }
 

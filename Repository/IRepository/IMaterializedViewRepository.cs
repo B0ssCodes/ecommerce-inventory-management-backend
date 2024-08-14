@@ -6,6 +6,8 @@
         public Task CreateCategoryMV();
         public Task CreateVendorMV();
 
+        public Task RefreshAndPaginateProduct();
+
         public Task RefreshProductMV();
         public Task RefreshCategoryMV();
         public Task RefreshVendorMV();
