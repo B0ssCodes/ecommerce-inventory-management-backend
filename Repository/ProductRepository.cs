@@ -19,7 +19,7 @@ namespace Inventory_Management_Backend.Repository
             _configuration = configuration;
 
         }
-        public async Task<ProductResponseDTO> CreateProduct(ProductRequestDTO productRequestDTO)
+        public async Task CreateProduct(ProductRequestDTO productRequestDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
@@ -118,41 +118,8 @@ namespace Inventory_Management_Backend.Repository
                             }, transaction);
                         }
 
-                        // Fetch the inserted images
-                        var fetchImagesQuery = @"
-                SELECT image_id_pkey AS ImageID, image_url AS Url
-                FROM image
-                WHERE product_id = @ProductID";
-
-                        var images = (await connection.QueryAsync<ImageResponseDTO>(fetchImagesQuery, new
-                        {
-                            ProductID = insertedProduct.ProductID
-                        }, transaction)).ToList();
-
-                        // Get the category details based on the passed ID
-                        var categoryQuery = @"
-                SELECT category_id_pkey AS CategoryID, category_name AS Name
-                FROM Category
-                WHERE category_id_pkey = @CategoryID";
-
-                        var category = await connection.QuerySingleOrDefaultAsync<CategoryResponseDTO>(categoryQuery, new
-                        {
-                            CategoryID = productRequestDTO.CategoryID
-                        }, transaction);
-
-                        if (category == null)
-                        {
-                            throw new Exception("Category not found");
-                        }
-
                         // Commit the transaction
                         transaction.Commit();
-
-                        // Set the category and images in the response DTO
-                        insertedProduct.Category = category;
-                        insertedProduct.Images = images;
-
-                        return insertedProduct;
                     }
                     catch
                     {
@@ -164,7 +131,7 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task<bool> DeleteProduct(int productID)
+        public async Task DeleteProduct(int productID)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
@@ -192,9 +159,9 @@ namespace Inventory_Management_Backend.Repository
                 var parameters = new { ProductID = productID };
 
                 await connection.QueryFirstOrDefaultAsync(deleteQuery, parameters);
-                return true;
             }
         }
+
 
         public async Task<ProductResponseDTO> GetProduct(int productID)
         {
@@ -379,7 +346,7 @@ namespace Inventory_Management_Backend.Repository
         }
 
 
-        public async Task<ProductResponseDTO> UpdateProduct(int productID, ProductRequestDTO productRequestDTO)
+        public async Task UpdateProduct(int productID, ProductRequestDTO productRequestDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
@@ -391,16 +358,16 @@ namespace Inventory_Management_Backend.Repository
                     {
                         // Fetch existing images to delete them from the local directory
                         var fetchExistingImagesQuery = @"
-                SELECT image_url AS Url
-                FROM image
-                WHERE product_id = @ProductID";
+                            SELECT image_url AS Url
+                            FROM image
+                            WHERE product_id = @ProductID";
 
                         var existingImages = (await connection.QueryAsync<string>(fetchExistingImagesQuery, new { ProductID = productID }, transaction)).ToList();
 
                         // Delete existing images from the database
                         var deleteImagesQuery = @"
-                DELETE FROM image
-                WHERE product_id = @ProductID";
+                            DELETE FROM image
+                            WHERE product_id = @ProductID";
 
                         await connection.ExecuteAsync(deleteImagesQuery, new { ProductID = productID }, transaction);
 
@@ -471,7 +438,7 @@ namespace Inventory_Management_Backend.Repository
                           product_cost_price AS Cost, 
                           category_id AS CategoryID";
 
-                        var updatedProduct = await connection.QuerySingleOrDefaultAsync<ProductResponseDTO>(updateProductQuery, new
+                        await connection.QuerySingleOrDefaultAsync<ProductResponseDTO>(updateProductQuery, new
                         {
                             productRequestDTO.SKU,
                             productRequestDTO.Name,
@@ -482,43 +449,8 @@ namespace Inventory_Management_Backend.Repository
                             ProductID = productID
                         }, transaction);
 
-                        if (updatedProduct == null)
-                        {
-                            throw new Exception("Product update failed");
-                        }
-
-                        // Fetch the updated images
-                        var fetchImagesQuery = @"
-                SELECT image_id_pkey AS ImageID, image_url AS Url
-                FROM image
-                WHERE product_id = @ProductID";
-
-                        var images = (await connection.QueryAsync<ImageResponseDTO>(fetchImagesQuery, new { ProductID = productID }, transaction)).ToList();
-
-                        // Get the category details based on the passed ID
-                        var categoryQuery = @"
-                SELECT category_id_pkey AS CategoryID, category_name AS Name
-                FROM Category
-                WHERE category_id_pkey = @CategoryID";
-
-                        var category = await connection.QuerySingleOrDefaultAsync<CategoryResponseDTO>(categoryQuery, new
-                        {
-                            CategoryID = productRequestDTO.CategoryID
-                        }, transaction);
-
-                        if (category == null)
-                        {
-                            throw new Exception("Category not found");
-                        }
-
                         // Commit the transaction
                         transaction.Commit();
-
-                        // Set the category and images in the response DTO
-                        updatedProduct.Category = category;
-                        updatedProduct.Images = images;
-
-                        return updatedProduct;
                     }
                     catch
                     {
