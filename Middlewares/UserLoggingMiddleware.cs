@@ -55,6 +55,10 @@ public class UserLoggingMiddleware
                 id = int.Parse(pathSegments[3]);
                 beforeStateJson = JsonSerializer.Serialize(await productRepository.GetProduct(id));
             }
+            else if (model == "mv")
+            {
+                beforeStateJson = JsonSerializer.Serialize(new { refreshed = $"{pathSegments[3]}" });
+            }
             else if (model == "analytics")
             {
                 beforeStateJson = JsonSerializer.Serialize(new { analytics = $"{action}" });

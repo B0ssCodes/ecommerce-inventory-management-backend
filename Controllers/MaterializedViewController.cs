@@ -6,30 +6,30 @@ using System.Net;
 
 namespace Inventory_Management_Backend.Controllers
 {
-    [Route("api/analytics")]
+    [Route("api/mv")]
     [ApiController]
-    public class AnalyticsController : ControllerBase
+    public class MaterializedViewController : ControllerBase
     {
-        private readonly IAnalyticsRepository _analyticsRepository;
+        private readonly IMaterializedViewRepository _mvRepository;
         private readonly ApiResponse _response;
 
-        public AnalyticsController(IAnalyticsRepository analyticsRepository, ApiResponse response)
+        public MaterializedViewController(IMaterializedViewRepository mvRepository, ApiResponse response)
         {
-            _analyticsRepository = analyticsRepository;
+            _mvRepository = mvRepository;
             _response = response;
         }
 
         [HttpGet]
-        [Route("getProduct")]
-        public async Task<IActionResult> GetProductAnalytics()
+        [Route("refresh/product")]
+        public async Task<IActionResult> RefreshProduct()
         {
             try
             {
-                var result = await _analyticsRepository.GetProductAnalytics();
+                await _mvRepository.RefreshProductMV();
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
-                _response.Message = "Product analytics fetched successfully";
-                _response.Result = result;
+                _response.Message = "Product analytics refreshed successfully";
+                _response.Result = default;
                 return Ok(_response);
             }
             catch (Exception ex)
@@ -37,22 +37,23 @@ namespace Inventory_Management_Backend.Controllers
                 _response.StatusCode = HttpStatusCode.BadRequest;
                 _response.IsSuccess = false;
                 _response.Message = ex.Message;
-                _response.Result = null;
+                _response.Result = default;
                 return BadRequest(_response);
             }
+
         }
 
         [HttpGet]
-        [Route("getVendor/{VendorCount}")]
-        public async Task<IActionResult> GetVendorAnalytics(int VendorCount)
+        [Route("refresh/vendor")]
+        public async Task<IActionResult> RefreshVendor()
         {
             try
             {
-                var result = await _analyticsRepository.GetVendorAnalytics(VendorCount);
+                await _mvRepository.RefreshVendorMV();
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
-                _response.Message = "Vendor analytics fetched successfully";
-                _response.Result = result;
+                _response.Message = "Vendor analytics refreshed successfully";
+                _response.Result = default;
                 return Ok(_response);
             }
             catch (Exception ex)
@@ -60,22 +61,23 @@ namespace Inventory_Management_Backend.Controllers
                 _response.StatusCode = HttpStatusCode.BadRequest;
                 _response.IsSuccess = false;
                 _response.Message = ex.Message;
-                _response.Result = null;
+                _response.Result = default;
                 return BadRequest(_response);
             }
+
         }
 
         [HttpGet]
-        [Route("getCategory/{CategoryCount}")]
-        public async Task<IActionResult> GetCategoryAnalytics(int CategoryCount)
+        [Route("refresh/category")]
+        public async Task<IActionResult> RefreshCategory()
         {
             try
             {
-                var result = await _analyticsRepository.GetCategoryAnalytics(CategoryCount);
+                await _mvRepository.RefreshCategoryMV();
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
-                _response.Message = "Category analytics fetched successfully";
-                _response.Result = result;
+                _response.Message = "Category analytics refreshed successfully";
+                _response.Result = default;
                 return Ok(_response);
             }
             catch (Exception ex)
@@ -83,9 +85,10 @@ namespace Inventory_Management_Backend.Controllers
                 _response.StatusCode = HttpStatusCode.BadRequest;
                 _response.IsSuccess = false;
                 _response.Message = ex.Message;
-                _response.Result = null;
+                _response.Result = default;
                 return BadRequest(_response);
             }
+
         }
     }
 }

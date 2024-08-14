@@ -76,6 +76,7 @@ builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
 builder.Services.AddScoped<IUserPermissionRepository, UserPermissionRepository>();
 builder.Services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
 builder.Services.AddScoped<IUserLogRepository, UserLogRepository>();
+builder.Services.AddScoped<IMaterializedViewRepository, MaterializedViewRepository>();
 builder.Services.AddScoped<ApiResponse>();
 builder.Services.AddMemoryCache();
 

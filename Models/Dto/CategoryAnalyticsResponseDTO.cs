@@ -6,6 +6,7 @@
         public string CategoryName { get; set; }
         public int ProductsSold { get; set; }
         public decimal StockValue { get; set; }
-        
+        public DateTime LastUpdated { get; set; }
+
     }
 }

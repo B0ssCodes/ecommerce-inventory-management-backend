@@ -11,90 +11,61 @@ namespace Inventory_Management_Backend.Repository
     public class AnalyticsRepository : IAnalyticsRepository
     {
         private readonly DapperContext _db;
-        private readonly IMemoryCache _cache;
-        private const string CacheKey = "ProductAnalytics";
+        private readonly IMaterializedViewRepository _mvRepository;
 
-        public AnalyticsRepository(DapperContext db, IMemoryCache cache)
+        public AnalyticsRepository(DapperContext db, IMaterializedViewRepository mvRepository)
         {
             _db = db;
-            _cache = cache;
+            _mvRepository = mvRepository;
         }
 
-        public async Task<IEnumerable<ProductAnalyticsResponseDTO>> GetProductAnalytics(int refreshDays)
+        public async Task<IEnumerable<ProductAnalyticsResponseDTO>> GetProductAnalytics()
         {
-            if (!_cache.TryGetValue(CacheKey, out IEnumerable<ProductAnalyticsResponseDTO> analyticsList))
+            await _mvRepository.CreateProductMV();
+            using (IDbConnection connection = _db.CreateConnection())
             {
-                using (IDbConnection connection = _db.CreateConnection())
+                var query = @"
+                    SELECT 
+                        product_id_pkey AS ProductID,
+                        product_name AS ProductName,
+                        sku AS ProductSKU,
+                        units_bought AS UnitsBought,
+                        units_sold AS UnitsSold,
+                        money_spent AS MoneySpent,
+                        money_earned AS MoneyEarned,
+                        start_date AS FromDate,
+                        end_date AS ToDate
+                    FROM mv_product_analytics
+                    ORDER BY money_earned DESC;";
+
+                var result = await connection.QueryAsync<ProductAnalyticsResponseDTO>(query);
+
+                // Calculate profit for each product
+                foreach (var analytics in result)
                 {
-                    connection.Open();
-
-                    var query = @"
-                        SELECT 
-                            p.product_id_pkey AS ProductID,
-                            p.product_name AS ProductName,
-                            p.sku AS ProductSKU,
-                            COALESCE(SUM(CASE WHEN t.transaction_type_id = 1 THEN ti.transaction_item_quantity ELSE 0 END), 0) AS UnitsBought,
-                            COALESCE(SUM(CASE WHEN t.transaction_type_id = 2 THEN ti.transaction_item_quantity ELSE 0 END), 0) AS UnitsSold,
-                            COALESCE(SUM(CASE WHEN t.transaction_type_id = 1 THEN ti.transaction_item_quantity * p.product_cost_price ELSE 0 END), 0) AS MoneySpent,
-                            COALESCE(SUM(CASE WHEN t.transaction_type_id = 2 THEN ti.transaction_item_quantity * p.product_price ELSE 0 END), 0) AS MoneyEarned
-                        FROM product p
-                        LEFT JOIN transaction_item ti ON p.product_id_pkey = ti.product_id
-                        LEFT JOIN transaction t ON ti.transaction_id = t.transaction_id_pkey AND t.transaction_date >= @StartDate
-                        GROUP BY p.product_id_pkey, p.product_name, p.sku
-                        ORDER BY p.product_id_pkey;";
-
-                    var startDate = DateTime.Now.AddDays(-refreshDays);
-
-                    var parameters = new { StartDate = startDate };
-
-                    var result = await connection.QueryAsync<ProductAnalyticsResponseDTO>(query, parameters);
-
-                    analyticsList = result;
-
-                    // Calculate profit for each product
-                    foreach (var analytics in analyticsList)
-                    {
-                        analytics.Profit = analytics.MoneyEarned - analytics.MoneySpent;
-                        analytics.FromDate = startDate;
-                        analytics.ToDate = DateTime.Now;
-                    }
-
-                    // Set cache options
-                    var cacheEntryOptions = new MemoryCacheEntryOptions()
-                        .SetSlidingExpiration(TimeSpan.FromDays(refreshDays));
-
-                    // Save data in cache
-                    _cache.Set(CacheKey, analyticsList, cacheEntryOptions);
+                    analytics.Profit = analytics.MoneyEarned - analytics.MoneySpent;
                 }
+
+                return result;
             }
-
-            return analyticsList;
-        }
-
-        public  async Task ResetProductAnalyticsCache()
-        {
-            _cache.Remove(CacheKey);
         }
 
         public async Task<IEnumerable<VendorAnalyticsResponseDTO>> GetVendorAnalytics(int vendorCount)
         {
+            await _mvRepository.CreateVendorMV();
             using (IDbConnection connection = _db.CreateConnection())
             {
                 connection.Open();
 
                 var query = @"
             SELECT 
-                v.vendor_id_pkey AS VendorID,
-                v.vendor_name AS VendorName,
-                v.vendor_email AS VendorEmail,
-                COALESCE(SUM(ti.transaction_item_quantity), 0) AS ProductsSold,
-                COALESCE(SUM(ti.transaction_item_price), 0) AS StockValue
-            FROM vendor v
-            LEFT JOIN transaction t ON v.vendor_id_pkey = t.vendor_id
-            LEFT JOIN transaction_item ti ON t.transaction_id_pkey = ti.transaction_id
-            WHERE t.transaction_type_id = 1
-            GROUP BY v.vendor_id_pkey, v.vendor_name, v.vendor_email
-            ORDER BY ProductsSold DESC
+                vendor_id_pkey AS VendorID,
+                vendor_name AS VendorName,
+                vendor_email AS VendorEmail,
+                products_sold AS ProductsSold,
+                stock_value AS StockValue,
+                last_updated AS LastUpdated
+            FROM mv_vendor_analytics
             LIMIT @VendorCount;";
 
                 var parameters = new { VendorCount = vendorCount };
@@ -109,21 +80,18 @@ namespace Inventory_Management_Backend.Repository
 
         public async Task<IEnumerable<CategoryAnalyticsResponseDTO>> GetCategoryAnalytics(int CategoryCount)
         {
+            await _mvRepository.CreateCategoryMV();
             using (IDbConnection connection = _db.CreateConnection())
             {
                 var query = @"
-                    SELECT c.category_id_pkey AS CategoryID,
-                           c.category_name AS CategoryName,
-                           COALESCE(SUM(CASE WHEN t.transaction_type_id = 2 THEN ti.transaction_item_quantity ELSE 0 END), 0) AS ProductsSold, 
-                            COALESCE(SUM(CASE WHEN t.transaction_type_id = 2 THEN ti.transaction_item_price ELSE 0 END), 0) AS StockValue
-                    FROM category c
-                    LEFT JOIN product p ON c.category_id_pkey = p.category_id
-                    LEFT JOIN transaction_item ti ON p.product_id_pkey = ti.product_id
-                    LEFT JOIN transaction t ON ti.transaction_id = t.transaction_id_pkey
-                    GROUP BY c.category_id_pkey, c.category_name
-                    ORDER BY StockValue DESC
+                    SELECT category_id_pkey AS CategoryID,
+                           category_name AS CategoryName,
+                           products_sold AS ProductsSold, 
+                           stock_value AS StockValue,
+                           last_updated AS LastUpdated
+                    FROM mv_category_analytics
                     LIMIT @CategoryCount;";
-                
+
                 var parameters = new { CategoryCount = CategoryCount };
 
                 var result = await connection.QueryAsync<CategoryAnalyticsResponseDTO>(query, parameters);
@@ -131,5 +99,7 @@ namespace Inventory_Management_Backend.Repository
                 return result;
             }
         }
+
+
     }
 }
