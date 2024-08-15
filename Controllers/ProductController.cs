@@ -21,12 +21,12 @@ namespace Inventory_Management_Backend.Controllers
 
         [HttpPost]
         //[Authorize]
-        [Route("get")]
-        public async Task<IActionResult> GetProducts(PaginationParams paginationParams)
+        [Route("get/{pageNumber}")]
+        public async Task<IActionResult> GetProducts(int pageNumber)
         {
             try
             {
-                var(products, itemCount) = await _productRepository.GetProducts(paginationParams);
+                var(products, itemCount) = await _productRepository.GetProducts(pageNumber);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Products retrieved successfully";
@@ -110,11 +110,11 @@ namespace Inventory_Management_Backend.Controllers
         {
             try
             {
-                ProductResponseDTO product = await _productRepository.CreateProduct(productDTO);
+                 await _productRepository.CreateProduct(productDTO);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Product created successfully";
-                _response.Result = product;
+                _response.Result = default;
                 return Ok(_response);
             }
             catch (Exception ex)
@@ -134,7 +134,7 @@ namespace Inventory_Management_Backend.Controllers
         {
             try
             {
-                bool isDeleted = await _productRepository.DeleteProduct(productID);
+                await _productRepository.DeleteProduct(productID);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Product deleted successfully";
@@ -160,11 +160,11 @@ namespace Inventory_Management_Backend.Controllers
         {
             try
             {
-                ProductResponseDTO product = await _productRepository.UpdateProduct(productID,productDTO);
+                await _productRepository.UpdateProduct(productID,productDTO);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Product updated successfully";
-                _response.Result = product;
+                _response.Result = default;
                 return Ok(_response);
             }
             catch (Exception ex)

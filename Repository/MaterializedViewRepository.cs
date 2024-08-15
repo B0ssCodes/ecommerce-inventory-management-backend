@@ -12,6 +12,24 @@ namespace Inventory_Management_Backend.Repository
         {
             _db = db;
         }
+
+        public async Task CheckProductMVExists()
+        {
+            using (IDbConnection connection = _db.CreateConnection())
+            {
+                var query = "SELECT EXISTS (SELECT 1 FROM pg_matviews WHERE matviewname = 'mv_product_1')";
+
+                bool exists = await connection.ExecuteScalarAsync<bool>(query);
+
+                if (!exists)
+                {
+                    await RefreshAndPaginateProduct();
+                }
+            }
+                
+
+        }
+
         public async Task CreateCategoryMV()
         {
             using (IDbConnection connection = _db.CreateConnection())
@@ -163,7 +181,7 @@ namespace Inventory_Management_Backend.Repository
 
                     int totalProducts = await connection.ExecuteScalarAsync<int>(getTotalProductsQuery, transaction);
 
-                    int pageSize = 20;
+                    int pageSize = 2;
 
                     int totalPages = (int)Math.Ceiling((double)totalProducts / pageSize);
 
@@ -172,51 +190,42 @@ namespace Inventory_Management_Backend.Repository
                         int offset = i * pageSize;
                         string pageName = $"mv_product_{i + 1}";
 
-                        // product_page_1
-                        // product_page_2
-                        // product_page_3
+                        var checkViewExistsQuery = $"SELECT EXISTS (SELECT 1 FROM pg_matviews WHERE matviewname = '{pageName}')";
 
-                        // Product start at page 1 and we are sorting by product_id descending, so page 1 will have the latest products
-
-                        var checkViewExistsQuery = $"SELECT EXISTS (SELECT 1 FROM pg_matviews WHERE matviewname = @PageName)";
-
-                        var existsParameters = new { PageName = pageName };
-
-                        var viewExists = await connection.ExecuteScalarAsync<bool>(checkViewExistsQuery, existsParameters, transaction);
+                        var viewExists = await connection.ExecuteScalarAsync<bool>(checkViewExistsQuery, transaction);
                         if (viewExists)
                         {
                             var refreshViewQuery = $"REFRESH MATERIALIZED VIEW {pageName}";
-                            await connection.ExecuteAsync(refreshViewQuery);
+                            await connection.ExecuteAsync(refreshViewQuery, transaction: transaction);
                         }
                         else
                         {
                             var createViewQuery = $@"
-                                CREATE MATERIALIZED VIEW @PageName
-                                AS
-                                SELECT 
-                                    p.product_id_pkey AS product_id_pkey, 
-                                    p.sku AS sku, 
-                                    p.product_name AS product_name, 
-                                    p.product_description AS product_description, 
-                                    p.product_price AS product_price, 
-                                    p.product_cost_price AS product_cost, 
-                                    c.category_id AS category_id,
-                                    c.category_name AS category_name,    
-                                    (SELECT COUNT(image_id_pkey) FROM image WHERE product_id = p.product_id_pkey) AS ImageCount,
-                                FROM product p
-                                JOIN category c ON p.category_id = c.category_id_pkey
-                                WHERE (@SearchQuery IS NULL OR p.product_name ILIKE '%' || @SearchQuery || '%' 
-                                       OR p.product_description ILIKE '%' || @SearchQuery || '%' 
-                                       OR p.sku ILIKE '%' || @SearchQuery || '%')
-                                AND deleted = false 
-                                ORDER BY p.product_id_pkey DESC
-                                LIMIT @PageSize OFFSET @Offset";
+                        CREATE MATERIALIZED VIEW {pageName}
+                        AS
+                        SELECT 
+                            p.product_id_pkey AS product_id_pkey, 
+                            p.sku AS sku, 
+                            p.product_name AS product_name, 
+                            p.product_description AS product_description, 
+                            p.product_price AS product_price, 
+                            p.product_cost_price AS product_cost, 
+                            c.category_id_pkey AS category_id,
+                            c.category_name AS category_name,
+                            c.category_description AS category_description,    
+                            (SELECT COUNT(image_id_pkey) FROM image WHERE product_id = p.product_id_pkey) AS image_count,
+                            {totalPages} AS total_pages
+                        FROM product p
+                        JOIN category c ON p.category_id = c.category_id_pkey
+                        WHERE p.deleted = false 
+                        ORDER BY p.product_id_pkey DESC
+                        LIMIT {pageSize} OFFSET {offset}";
 
-                            var createParameters = new { PageName = pageName, SearchQuery = "", PageSize = pageSize, Offset = offset };
-
-                            await connection.ExecuteAsync(createViewQuery, createParameters);
+                            await connection.ExecuteAsync(createViewQuery, transaction: transaction);
                         }
                     }
+
+                    transaction.Commit();
                 }
             }
         }

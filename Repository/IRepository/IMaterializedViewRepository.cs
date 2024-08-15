@@ -11,5 +11,7 @@
         public Task RefreshProductMV();
         public Task RefreshCategoryMV();
         public Task RefreshVendorMV();
+
+        public Task CheckProductMVExists();
     }
 }

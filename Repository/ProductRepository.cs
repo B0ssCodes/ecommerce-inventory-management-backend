@@ -12,12 +12,13 @@ namespace Inventory_Management_Backend.Repository
     {
         private readonly DapperContext _db;
         private readonly IConfiguration _configuration;
+        private readonly IMaterializedViewRepository _mvRepository;
 
-        public ProductRepository(DapperContext db, IConfiguration configuration)
+        public ProductRepository(DapperContext db, IConfiguration configuration, IMaterializedViewRepository mvRepository)
         {
             _db = db;
             _configuration = configuration;
-
+            _mvRepository = mvRepository;
         }
         public async Task CreateProduct(ProductRequestDTO productRequestDTO)
         {
@@ -217,74 +218,46 @@ namespace Inventory_Management_Backend.Repository
         }
 
 
-        public async Task<(List<AllProductResponseDTO>, int)> GetProducts(PaginationParams paginationParams)
+        public async Task<(IEnumerable<AllProductResponseDTO>, int)> GetProducts(int pageNumber)
         {
+            await _mvRepository.CheckProductMVExists();
             using (IDbConnection connection = _db.CreateConnection())
             {
-                connection.Open(); // Explicitly open the connection
+                connection.Open(); // Explicitly open the connection   
 
-                var offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
-
-                var query = @"
-        WITH ProductCTE AS (
-            SELECT 
-                p.product_id_pkey AS ProductID, 
-                p.sku AS SKU, 
-                p.product_name AS Name, 
-                p.product_description AS Description, 
-                p.product_price AS Price, 
-                p.product_cost_price AS Cost, 
-                p.category_id AS CategoryID,
-                (SELECT COUNT(*) FROM image WHERE product_id = p.product_id_pkey) AS ImageCount,
-                COUNT(*) OVER() AS TotalCount
-            FROM product p
-            WHERE (@SearchQuery IS NULL OR p.product_name ILIKE '%' || @SearchQuery || '%' 
-                   OR p.product_description ILIKE '%' || @SearchQuery || '%' 
-                   OR p.sku ILIKE '%' || @SearchQuery || '%')
-            AND deleted = false
-        )
-        SELECT ProductID, SKU, Name, Description, Price, Cost, CategoryID, ImageCount, TotalCount
-        FROM ProductCTE
-        ORDER BY ProductID DESC
-        OFFSET @Offset ROWS
-        FETCH NEXT @PageSize ROWS ONLY;";
-
-                var parameters = new
+                using (IDbTransaction transaction = connection.BeginTransaction())
                 {
-                    Offset = offset,
-                    PageSize = paginationParams.PageSize,
-                    SearchQuery = paginationParams.Search
-                };
+                    var query = $@"
+                SELECT product_id_pkey AS ProductID,
+                       sku AS SKU,
+                       product_name AS Name,
+                       product_description AS Description,
+                       product_price AS Price,
+                       product_cost AS Cost,
+                       category_id AS CategoryID,
+                       category_name AS Name,
+                       category_description AS Description,
+                       image_count AS ImageCount,
+                       total_pages AS ItemCount
+                FROM mv_product_{pageNumber};
+                ;";
 
-                var result = await connection.QueryAsync<AllProductResponseDTO, long, (AllProductResponseDTO, long)>(
-                    query,
-                    (product, totalCount) => (product, totalCount),
-                    parameters,
-                    splitOn: "TotalCount"
-                );
+                    var result = await connection.QueryAsync<AllProductResponseDTO, CategoryResponseDTO, int, (AllProductResponseDTO, int)>(
+                        query,
+                        (product, category, itemCount) =>
+                        {
+                            product.Category = category;
+                            return (product, itemCount);
+                        },
+                        splitOn: "CategoryID,ItemCount",
+                        transaction: transaction
+                    );
 
-                var products = result.Select(r => r.Item1).ToList();
-                int totalCount = result.Any() ? (int)result.First().Item2 : 0; // Explicitly cast to int
+                    var products = result.Select(r => r.Item1).ToList();
+                    int totalItemCount = result.Any() ? (int)result.First().Item2 : 0;
 
-                var fetchCategoryQuery = @"
-        SELECT category_id_pkey AS CategoryID, category_name AS Name
-        FROM category
-        WHERE category_id_pkey = @CategoryID";
-
-                foreach (var product in products)
-                {
-                    // Fetch category
-                    var category = await connection.QuerySingleOrDefaultAsync<CategoryResponseDTO>(fetchCategoryQuery, new { CategoryID = product.CategoryID });
-
-                    if (category == null)
-                    {
-                        throw new Exception($"Category not found for product ID {product.ProductID}");
-                    }
-
-                    product.Category = category;
+                    return (products, totalItemCount);
                 }
-
-                return (products, totalCount);
             }
         }
 
