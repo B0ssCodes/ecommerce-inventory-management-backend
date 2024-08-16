@@ -1,5 +1,6 @@
 ﻿using Dapper;
 using Inventory_Management_Backend.Data;
+using Inventory_Management_Backend.Models;
 using Inventory_Management_Backend.Repository.IRepository;
 using System.Data;
 
@@ -11,23 +12,6 @@ namespace Inventory_Management_Backend.Repository
         public MaterializedViewRepository(DapperContext db)
         {
             _db = db;
-        }
-
-        public async Task CheckProductMVExists()
-        {
-            using (IDbConnection connection = _db.CreateConnection())
-            {
-                var query = "SELECT EXISTS (SELECT 1 FROM pg_matviews WHERE matviewname = 'mv_product_1')";
-
-                bool exists = await connection.ExecuteScalarAsync<bool>(query);
-
-                if (!exists)
-                {
-                    await RefreshAndPaginateProduct();
-                }
-            }
-                
-
         }
 
         public async Task CreateCategoryMV()
@@ -166,67 +150,6 @@ namespace Inventory_Management_Backend.Repository
                     await connection.ExecuteAsync(createViewQuery);
                 }
 
-            }
-        }
-
-        public async Task RefreshAndPaginateProduct()
-        {
-            using (IDbConnection connection = _db.CreateConnection())
-            {
-                connection.Open();
-
-                using (IDbTransaction transaction = connection.BeginTransaction())
-                {
-                    var getTotalProductsQuery = "SELECT COUNT(product_id_pkey) FROM product";
-
-                    int totalProducts = await connection.ExecuteScalarAsync<int>(getTotalProductsQuery, transaction);
-
-                    int pageSize = 2;
-
-                    int totalPages = (int)Math.Ceiling((double)totalProducts / pageSize);
-
-                    for (int i = 0; i < totalPages; i++)
-                    {
-                        int offset = i * pageSize;
-                        string pageName = $"mv_product_{i + 1}";
-
-                        var checkViewExistsQuery = $"SELECT EXISTS (SELECT 1 FROM pg_matviews WHERE matviewname = '{pageName}')";
-
-                        var viewExists = await connection.ExecuteScalarAsync<bool>(checkViewExistsQuery, transaction);
-                        if (viewExists)
-                        {
-                            var refreshViewQuery = $"REFRESH MATERIALIZED VIEW {pageName}";
-                            await connection.ExecuteAsync(refreshViewQuery, transaction: transaction);
-                        }
-                        else
-                        {
-                            var createViewQuery = $@"
-                        CREATE MATERIALIZED VIEW {pageName}
-                        AS
-                        SELECT 
-                            p.product_id_pkey AS product_id_pkey, 
-                            p.sku AS sku, 
-                            p.product_name AS product_name, 
-                            p.product_description AS product_description, 
-                            p.product_price AS product_price, 
-                            p.product_cost_price AS product_cost, 
-                            c.category_id_pkey AS category_id,
-                            c.category_name AS category_name,
-                            c.category_description AS category_description,    
-                            (SELECT COUNT(image_id_pkey) FROM image WHERE product_id = p.product_id_pkey) AS image_count,
-                            {totalPages} AS total_pages
-                        FROM product p
-                        JOIN category c ON p.category_id = c.category_id_pkey
-                        WHERE p.deleted = false 
-                        ORDER BY p.product_id_pkey DESC
-                        LIMIT {pageSize} OFFSET {offset}";
-
-                            await connection.ExecuteAsync(createViewQuery, transaction: transaction);
-                        }
-                    }
-
-                    transaction.Commit();
-                }
             }
         }
 

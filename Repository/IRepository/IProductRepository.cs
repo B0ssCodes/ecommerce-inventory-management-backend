@@ -6,7 +6,7 @@ namespace Inventory_Management_Backend.Repository.IRepository
 {
     public interface IProductRepository
     {
-        public Task<(IEnumerable<AllProductResponseDTO>, int itemCount)> GetProducts(int pageNumber);
+        public Task<(IEnumerable<AllProductResponseDTO>, int itemCount)> GetProducts(PaginationParams paginationParams);
         public Task<(List<ProductSelectResponseDTO>, int itemCount)> GetProductsSelect(int transactionTypeID, PaginationParams paginationParams);
         public Task<ProductResponseDTO> GetProduct(int productID);
         public Task CreateProduct(ProductRequestDTO productRequestDTO);

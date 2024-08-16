@@ -218,37 +218,77 @@ namespace Inventory_Management_Backend.Repository
         }
 
 
-        public async Task<(IEnumerable<AllProductResponseDTO>, int)> GetProducts(int pageNumber)
+        public async Task<(IEnumerable<AllProductResponseDTO>, int)> GetProducts(PaginationParams paginationParams)
         {
-            await _mvRepository.CheckProductMVExists();
             using (IDbConnection connection = _db.CreateConnection())
             {
                 connection.Open(); // Explicitly open the connection   
 
                 using (IDbTransaction transaction = connection.BeginTransaction())
                 {
-                    var query = $@"
-                SELECT product_id_pkey AS ProductID,
-                       sku AS SKU,
-                       product_name AS Name,
-                       product_description AS Description,
-                       product_price AS Price,
-                       product_cost AS Cost,
-                       category_id AS CategoryID,
-                       category_name AS Name,
-                       category_description AS Description,
-                       image_count AS ImageCount,
-                       total_pages AS ItemCount
-                FROM mv_product_{pageNumber};
-                ;";
+                    var pageNumber = paginationParams.PageNumber;
+                    var pageSize = paginationParams.PageSize;
+                    var searchQuery = paginationParams.Search;
+                    var startRow = (pageNumber - 1) * pageSize;
+                    var endRow = pageNumber * pageSize;
 
-                    var result = await connection.QueryAsync<AllProductResponseDTO, CategoryResponseDTO, int, (AllProductResponseDTO, int)>(
+                    var query = $@"
+                WITH FilteredProducts AS (
+                    SELECT 
+                        row_num,
+                        product_id_pkey AS ProductID,
+                        sku AS SKU,
+                        product_name AS Name,
+                        product_description AS Description,
+                        product_price AS Price,
+                        product_cost AS Cost,
+                        category_id AS CategoryID,
+                        category_name AS CategoryName,
+                        category_description AS CategoryDescription,
+                        image_count AS ImageCount,
+                        item_count AS ItemCount
+                    FROM product_mv
+                    WHERE (@SearchQuery IS NULL OR product_name ILIKE '%' || @SearchQuery || '%' 
+                           OR product_description ILIKE '%' || @SearchQuery || '%' 
+                           OR sku ILIKE '%' || @SearchQuery || '%')
+                )
+                SELECT 
+                    ProductID,
+                    SKU,
+                    Name,
+                    Description,
+                    Price,
+                    Cost,
+                    CategoryID,
+                    CategoryName,
+                    CategoryDescription,
+                    ImageCount,
+                    ItemCount
+                FROM FilteredProducts
+                WHERE row_num > @StartRow AND row_num <= @EndRow
+                ORDER BY row_num;";
+
+                    var parameters = new
+                    {
+                        StartRow = startRow,
+                        EndRow = endRow,
+                        PageSize = pageSize,
+                        SearchQuery = searchQuery
+                    };
+
+                    var result = await connection.QueryAsync<AllProductResponseDTO, CategoryResponseDTO, long, (AllProductResponseDTO, long)>(
                         query,
                         (product, category, itemCount) =>
                         {
-                            product.Category = category;
+                            product.Category = new CategoryResponseDTO
+                            {
+                                CategoryID = category.CategoryID,
+                                Name = category.Name,
+                                Description = category.Description
+                            };
                             return (product, itemCount);
                         },
+                        parameters,
                         splitOn: "CategoryID,ItemCount",
                         transaction: transaction
                     );

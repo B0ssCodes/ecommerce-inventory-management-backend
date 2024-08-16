@@ -58,31 +58,35 @@ namespace Inventory_Management_Backend.Repository
             {
                 connection.Open();
 
-                var offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
+                var pageNumber = paginationParams.PageNumber;
+                var pageSize = paginationParams.PageSize;
                 var searchQuery = paginationParams.Search;
+                var startRow = (pageNumber - 1) * pageSize;
+                var endRow = pageNumber * pageSize;
 
                 var query = @"
             WITH CategoryCTE AS (
                 SELECT 
+                    row_num,
                     category_id_pkey AS CategoryID, 
                     category_name AS Name, 
                     category_description AS Description,
-                    COUNT(*) OVER() AS TotalCount
-                FROM category
+                    item_count AS TotalCount
+                FROM category_mv
                 WHERE (@SearchQuery IS NULL OR 
                        category_name ILIKE '%' || @SearchQuery || '%' OR 
                        category_description ILIKE '%' || @SearchQuery || '%')
             )
             SELECT CategoryID, Name, Description, TotalCount
             FROM CategoryCTE
-            ORDER BY Name
-            OFFSET @Offset ROWS
-            FETCH NEXT @PageSize ROWS ONLY;";
+            WHERE row_num > @StartRow AND row_num <= @EndRow
+            ORDER BY row_num;";
 
                 var parameters = new
                 {
-                    Offset = offset,
-                    PageSize = paginationParams.PageSize,
+                    StartRow = startRow,
+                    EndRow = endRow,
+                    PageSize = pageSize,
                     SearchQuery = searchQuery
                 };
 

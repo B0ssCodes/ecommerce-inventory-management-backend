@@ -49,11 +49,13 @@ public class UserLoggingMiddleware
             if (model == "product" && action == "create")
             {
                 beforeStateJson = JsonSerializer.Serialize(new ProductRequestDTO());
+                afterStateJson = JsonSerializer.Serialize(new { product = "created" });
             }
             else if (model == "product" && action == "update")
             {
                 id = int.Parse(pathSegments[3]);
                 beforeStateJson = JsonSerializer.Serialize(await productRepository.GetProduct(id));
+                afterStateJson = JsonSerializer.Serialize(new { product = "updated" });
             }
             else if (model == "mv")
             {

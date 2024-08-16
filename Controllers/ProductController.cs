@@ -21,12 +21,12 @@ namespace Inventory_Management_Backend.Controllers
 
         [HttpPost]
         //[Authorize]
-        [Route("get/{pageNumber}")]
-        public async Task<IActionResult> GetProducts(int pageNumber)
+        [Route("get")]
+        public async Task<IActionResult> GetProducts(PaginationParams paginationParams)
         {
             try
             {
-                var(products, itemCount) = await _productRepository.GetProducts(pageNumber);
+                var(products, itemCount) = await _productRepository.GetProducts(paginationParams);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Products retrieved successfully";
