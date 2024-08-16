@@ -168,36 +168,38 @@ namespace Inventory_Management_Backend.Repository
             {
                 connection.Open();
 
+                var pageNumber = paginationParams.PageNumber;
+                var pageSize = paginationParams.PageSize;
+                var searchQuery = paginationParams.Search;
+                var startRow = (pageNumber - 1) * pageSize;
+                var endRow = pageNumber * pageSize;
+
                 // Base query
                 var baseQuery = @"
         WITH TransactionCTE AS (
             SELECT 
-                t.transaction_id_pkey AS TransactionID,
-                t.transaction_amount AS Amount,
-                t.transaction_date AS Date,
-                tt.transaction_type_id_pkey AS TypeID,
-                tt.type AS Type,
-                ts.status AS Status,
-                v.vendor_id_pkey AS VendorID,
-                v.vendor_name AS Name,
-                COUNT(*) OVER() AS TotalCount
-            FROM transaction t
-            JOIN vendor v ON t.vendor_id = v.vendor_id_pkey
-            JOIN transaction_type tt ON t.transaction_type_id = tt.transaction_type_id_pkey
-            JOIN transaction_status ts ON t.transaction_status_id = ts.transaction_status_id_pkey
-            WHERE (@Search IS NULL OR 
-                   t.transaction_amount::TEXT ILIKE '%' || @Search || '%' OR
-                   t.transaction_date::TEXT ILIKE '%' || @Search || '%' OR
-                   tt.type ILIKE '%' || @Search || '%' OR
-                   ts.status ILIKE '%' || @Search || '%' OR
-                   v.vendor_name ILIKE '%' || @Search || '%')
-            AND t.deleted = false
-          ";
+                row_num,
+                transaction_id_pkey AS TransactionID,
+                transaction_amount AS Amount,
+                transaction_date AS Date,
+                transaction_type_id_pkey AS TypeID,
+                type AS Type,
+                status AS Status,
+                vendor_id_pkey AS VendorID,
+                vendor_name AS Name,
+                item_count AS TotalCount
+            FROM transaction_mv
+            WHERE (@SearchQuery IS NULL OR 
+                   transaction_amount::TEXT ILIKE '%' || @SearchQuery  || '%' OR
+                   transaction_date::TEXT ILIKE '%' || @SearchQuery  || '%' OR
+                   type ILIKE '%' || @SearchQuery  || '%' OR
+                   status ILIKE '%' || @SearchQuery  || '%' OR
+                   vendor_name ILIKE '%' || @SearchQuery  || '%')";
 
                 // Add vendor ID conditionally
                 if (vendorEmail != null)
                 {
-                    baseQuery += " AND v.vendor_email = @VendorEmail";
+                    baseQuery += " AND vendor_email = @VendorEmail";
                 }
 
                 // Complete the query
@@ -205,15 +207,16 @@ namespace Inventory_Management_Backend.Repository
         )
         SELECT TransactionID, Amount, Date, TypeID, Type, Status, VendorID, Name, TotalCount
         FROM TransactionCTE
-        ORDER BY Date DESC
-        OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
+        WHERE row_num > @StartRow AND row_num <= @EndRow
+        ORDER BY row_num;";
 
                 var parameters = new
                 {
                     VendorEmail = vendorEmail,
-                    Offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize,
-                    PageSize = paginationParams.PageSize,
-                    Search = paginationParams.Search
+                    StartRow = startRow,
+                    EndRow = endRow,
+                    PageSize = pageSize,
+                    SearchQuery = searchQuery
                 };
 
                 var result = await connection.QueryAsync<AllTransactionResponseDTO, ShortVendorResponseDTO, long, (AllTransactionResponseDTO, long)>(

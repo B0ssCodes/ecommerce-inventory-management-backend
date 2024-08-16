@@ -25,7 +25,7 @@ namespace Inventory_Management_Backend.Repository
                 var query = @"
                     UPDATE user_info
                     SET deleted = true
-                    WHERE user_role_id_pkey = @UserID";
+                    WHERE user_id_pkey = @UserID";
 
                 await connection.ExecuteAsync(query, new { UserID = userID });
 
@@ -73,37 +73,40 @@ namespace Inventory_Management_Backend.Repository
             {
                 connection.Open();
 
-                var offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
+                var pageNumber = paginationParams.PageNumber;
+                var pageSize = paginationParams.PageSize;
                 var searchQuery = paginationParams.Search;
+                var startRow = (pageNumber - 1) * pageSize;
+                var endRow = pageNumber * pageSize;
 
                 // CTE to get total count of users
                 var query = @"
         WITH UserCTE AS (
             SELECT 
-                u.user_id_pkey AS UserID,
-                u.user_first_name AS FirstName,
-                u.user_last_name AS LastName, 
-                u.user_email AS Email, 
-                r.user_role_id_pkey AS UserRoleID,
-                r.role AS Role,
-                COUNT(*) OVER() AS UserCount
-            FROM user_info u
-            INNER JOIN user_role r ON u.user_role_id = r.user_role_id_pkey
-            WHERE (@SearchQuery IS NULL OR 
-                   u.user_first_name ILIKE '%' || @SearchQuery || '%' OR 
-                   u.user_last_name ILIKE '%' || @SearchQuery || '%' OR 
-                   u.user_email ILIKE '%' || @SearchQuery || '%')
+                row_num,
+                user_id_pkey AS UserID,
+                user_first_name AS FirstName,
+                user_last_name AS LastName, 
+                user_email AS Email, 
+                user_role_id AS UserRoleID,
+                role AS Role,
+                item_count AS UserCount
+            FROM user_mv
+                   WHERE (@SearchQuery IS NULL OR 
+                   user_first_name ILIKE '%' || @SearchQuery || '%' OR 
+                   user_last_name ILIKE '%' || @SearchQuery || '%' OR 
+                   user_email ILIKE '%' || @SearchQuery || '%')
         )
         SELECT UserID, FirstName, LastName, Email, UserRoleID, Role, UserCount
         FROM UserCTE
-        ORDER BY FirstName
-        OFFSET @Offset ROWS
-        FETCH NEXT @PageSize ROWS ONLY;";
+        WHERE row_num > @StartRow AND row_num <= @EndRow
+        ORDER BY row_num;";
 
                 var parameters = new
                 {
-                    Offset = offset,
-                    PageSize = paginationParams.PageSize,
+                    StartRow = startRow,
+                    EndRow = endRow,
+                    PageSize = pageSize,
                     SearchQuery = searchQuery
                 };
 

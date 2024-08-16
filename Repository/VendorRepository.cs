@@ -93,39 +93,42 @@ namespace Inventory_Management_Backend.Repository
             {
                 connection.Open();
 
-                var offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
+                var pageNumber = paginationParams.PageNumber;
+                var pageSize = paginationParams.PageSize;
                 var searchQuery = paginationParams.Search;
+                var startRow = (pageNumber - 1) * pageSize;
+                var endRow = pageNumber * pageSize;
 
                 var query = @"
         WITH VendorCTE AS (
             SELECT 
+                row_num,
                 vendor_id_pkey AS VendorID, 
                 vendor_name AS Name, 
                 vendor_email AS Email,
                 vendor_phone_number AS Phone, 
                 vendor_commercial_phone AS CommercialPhone, 
                 vendor_address AS Address,
-                COUNT(*) OVER() AS VendorCount
-            FROM vendor
+                item_count AS VendorCount
+            FROM vendor_mv
             WHERE (@SearchQuery IS NULL OR 
                    vendor_name ILIKE '%' || @SearchQuery || '%' OR 
                    vendor_email ILIKE '%' || @SearchQuery || '%' OR 
                    vendor_phone_number ILIKE '%' || @SearchQuery || '%' OR 
                    vendor_commercial_phone ILIKE '%' || @SearchQuery || '%' OR 
-                   vendor_address ILIKE '%' || @SearchQuery || '%') 
-            AND deleted = false    
+                   vendor_address ILIKE '%' || @SearchQuery || '%')    
         )
         SELECT VendorID, Name, Email, Phone, CommercialPhone, Address, VendorCount
         FROM VendorCTE
-        ORDER BY VendorID DESC
-        OFFSET @Offset ROWS
-        FETCH NEXT @PageSize ROWS ONLY;";
+        WHERE row_num > @StartRow AND row_num <= @EndRow
+        ORDER BY row_num;";
 
                 var parameters = new
                 {
-                    SearchQuery = searchQuery,
-                    Offset = offset,
-                    PageSize = paginationParams.PageSize
+                    StartRow = startRow,
+                    EndRow = endRow,
+                    PageSize = pageSize,
+                    SearchQuery = searchQuery
                 };
 
                 var result = await connection.QueryAsync<VendorResponseDTO, long, (VendorResponseDTO, long)>(

@@ -126,28 +126,36 @@ namespace Inventory_Management_Backend.Repository
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
+                var pageNumber = paginationParams.PageNumber;
+                var pageSize = paginationParams.PageSize;
+                var searchQuery = paginationParams.Search;
+                var startRow = (pageNumber - 1) * pageSize;
+                var endRow = pageNumber * pageSize;
+
                 var query = @"
             WITH UserRoleCTE AS (
                 SELECT 
+                    row_num,
                     user_role_id_pkey AS UserRoleID, 
                     role AS Role,
-                    COUNT(*) OVER() AS TotalCount
-                FROM user_role
-                WHERE @Search IS NULL OR role ILIKE '%' || @Search || '%'
+                    item_count AS TotalCount
+                FROM user_role_mv
+                WHERE @SearchQuery IS NULL OR role ILIKE '%' || @SearchQuery || '%'
             )
             SELECT 
                 UserRoleID, 
                 Role, 
                 TotalCount
             FROM UserRoleCTE
-            ORDER BY Role
-            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
+            WHERE row_num > @StartRow AND row_num <= @EndRow
+            ORDER BY row_num;";
 
                 var parameters = new
                 {
-                    Search = paginationParams.Search,
-                    Offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize,
-                    PageSize = paginationParams.PageSize
+                    StartRow = startRow,
+                    EndRow = endRow,
+                    PageSize = pageSize,
+                    SearchQuery = searchQuery
                 };
 
                 var userRoles = await connection.QueryAsync<UserRoleDTO, long, (UserRoleDTO, long)>(query,
