@@ -44,15 +44,13 @@ namespace Inventory_Management_Backend.Repository
 
                 var query = @"
             SELECT 
-            u.user_id_pkey AS UserID,
+            user_id_pkey AS UserID,
             user_first_name AS FirstName,
-            u.user_last_name AS LastName,
-            u.user_email AS Email, 
-            r.user_role_id_pkey AS UserRoleID,
-            r.role AS Role 
-            FROM user_info u
-            INNER JOIN user_role r
-            ON u.user_role_id = r.user_role_id_pkey
+            user_last_name AS LastName,
+            user_email AS Email, 
+            user_role_id_pkey AS UserRoleID,
+            role AS Role 
+            FROM user_mv
             WHERE user_id_pkey = @UserID;";
 
                 var parameters = new { UserID = userID };

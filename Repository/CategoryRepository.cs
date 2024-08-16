@@ -110,7 +110,7 @@ namespace Inventory_Management_Backend.Repository
             {
                 var query = @"
                     SELECT category_id_pkey AS CategoryID, category_name AS Name, category_description AS Description
-                    FROM category
+                    FROM category_mv
                     WHERE category_id_pkey = @CategoryID";
 
                 var parameters = new { CategoryID = categoryID };

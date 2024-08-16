@@ -170,17 +170,22 @@ namespace Inventory_Management_Backend.Repository
             {
                 connection.Open(); // Explicitly open the connection
 
+                // Fetch the product details from the product_mv view
                 var query = @"
-        SELECT 
-            product_id_pkey AS ProductID, 
-            sku AS SKU, 
-            product_name AS Name, 
-            product_description AS Description, 
-            product_price AS Price, 
-            product_cost_price AS Cost, 
-            category_id AS CategoryID
-        FROM product
-        WHERE product_id_pkey = @ProductID";
+            SELECT 
+                product_id_pkey AS ProductID, 
+                sku AS SKU, 
+                product_name AS Name, 
+                product_description AS Description, 
+                product_price AS Price, 
+                product_cost AS Cost, 
+                category_id AS CategoryID,
+                category_name AS CategoryName,
+                category_description AS CategoryDescription,
+                image_count AS ImageCount,
+                item_count AS ItemCount
+            FROM product_mv
+            WHERE product_id_pkey = @ProductID";
 
                 var product = await connection.QuerySingleOrDefaultAsync<ProductResponseDTO>(query, new { ProductID = productID });
 
@@ -191,27 +196,20 @@ namespace Inventory_Management_Backend.Repository
 
                 // Fetch the images related to the product
                 var fetchImagesQuery = @"
-        SELECT image_id_pkey AS ImageID, image_url AS Url
-        FROM image
-        WHERE product_id = @ProductID";
+            SELECT image_id_pkey AS ImageID, image_url AS Url
+            FROM image
+            WHERE product_id = @ProductID";
 
                 var images = (await connection.QueryAsync<ImageResponseDTO>(fetchImagesQuery, new { ProductID = productID })).ToList();
                 product.Images = images;
 
-                // Fetch the category details
-                var fetchCategoryQuery = @"
-        SELECT category_id_pkey AS CategoryID, category_name AS Name
-        FROM category
-        WHERE category_id_pkey = @CategoryID";
-
-                var category = await connection.QuerySingleOrDefaultAsync<CategoryResponseDTO>(fetchCategoryQuery, new { CategoryID = product.CategoryID });
-
-                if (category == null)
+                // Fetch the category details (already included in the product_mv view)
+                product.Category = new CategoryResponseDTO
                 {
-                    throw new Exception("Category not found");
-                }
-
-                product.Category = category;
+                    CategoryID = product.CategoryID,
+                    Name = product.Name,
+                    Description = product.Description
+                };
 
                 return product;
             }

@@ -68,8 +68,8 @@ namespace Inventory_Management_Backend.Repository
                 var query = @"
                 SELECT vendor_id_pkey AS VendorID, vendor_name AS Name, vendor_email AS Email,
                        vendor_phone_number AS Phone, vendor_commercial_phone AS CommercialPhone, vendor_address AS Address
-                FROM vendor
-                WHERE vendor_id_pkey = @VendorID AND deleted = false;";
+                FROM vendor_mv
+                WHERE vendor_id_pkey = @VendorID;";
 
                 var parameters = new
                 {

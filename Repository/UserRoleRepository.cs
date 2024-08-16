@@ -87,7 +87,7 @@ namespace Inventory_Management_Backend.Repository
                    ur.role AS Role,
                    up.user_permission_id_pkey AS UserPermissionID,
                    up.permission AS Permission
-            FROM user_role ur
+            FROM user_role_mv ur
             LEFT JOIN user_role_permission urp ON ur.user_role_id_pkey = urp.user_role_id
             LEFT JOIN user_permission up ON up.user_permission_id_pkey = urp.user_permission_id
             WHERE ur.user_role_id_pkey = @UserRoleID";

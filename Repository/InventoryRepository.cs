@@ -197,7 +197,7 @@ namespace Inventory_Management_Backend.Repository
                            inventory_stock AS Quantity,
                            inventory_cost AS Price,
                            product_id AS ProductID
-                    FROM inventory
+                    FROM inventory_mv
                     WHERE inventory_id_pkey = @InventoryID;";
                 var parameters = new { InventoryID = inventoryID };
 
