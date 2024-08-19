@@ -140,19 +140,17 @@ public class UserLoggingMiddleware
                         break;
                 }
             }
-            else if (action.StartsWith("get", StringComparison.OrdinalIgnoreCase) && pathSegments.Length > 3)
+            else if ((action.StartsWith("get", StringComparison.OrdinalIgnoreCase) && pathSegments.Length > 3) || action == "getLowCount" || action == "getoutCount")
             {
-                if (int.TryParse(pathSegments[3], out id) && id != 0)
+                if (action !="getoutCount" && int.TryParse(pathSegments[3], out id) && id != 0)
                 {
                     beforeStateJson = JsonSerializer.Serialize(new { requested = $"{model} with id {id}" });
                 }
                 else
                 {
-                    using (var stream = new StreamReader(httpContext.Request.Body, Encoding.UTF8, leaveOpen: true))
-                    {
-                        beforeStateJson = await stream.ReadToEndAsync();
-                        httpContext.Request.Body.Position = 0;
-                    }
+                    
+                        beforeStateJson = JsonSerializer.Serialize(new { requested = $"{model} action: {action}" });
+                    
                 }
             }
             else
