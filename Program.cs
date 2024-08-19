@@ -65,6 +65,7 @@ if (string.IsNullOrEmpty(azureStorageConnectionString))
 }
 builder.Services.AddLogging();
 builder.Services.AddSingleton<DapperContext>();
+builder.Services.AddSingleton<TransactionStatus>();
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<IUserRoleRepository, UserRoleRepository>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();

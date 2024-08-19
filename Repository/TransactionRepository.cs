@@ -3,6 +3,7 @@ using Inventory_Management_Backend.Data;
 using Inventory_Management_Backend.Models;
 using Inventory_Management_Backend.Models.Dto;
 using Inventory_Management_Backend.Repository.IRepository;
+using Inventory_Management_Backend.Utilities.Enums;
 using System.Data;
 
 namespace Inventory_Management_Backend.Repository
@@ -65,7 +66,7 @@ namespace Inventory_Management_Backend.Repository
                     throw new Exception("Transaction does not exist");
                 }
 
-                if (transactionStatus != 1)
+                if (transactionStatus != (int)TransactionStatusEnum.Created)
                 {
                     throw new Exception("Transaction cannot be deleted");
                 }
@@ -264,7 +265,7 @@ namespace Inventory_Management_Backend.Repository
                         }
 
                         // 1 corresponds to the "created" status
-                        if (transactionTypeStatus.TransactionStatusID != 1)
+                        if (transactionTypeStatus.TransactionStatusID != (int)TransactionStatusEnum.Created)
                         {
                             throw new Exception("Transaction already submitted");
                         }
@@ -299,11 +300,11 @@ namespace Inventory_Management_Backend.Repository
                             if (inventoryID > 0)
                             {
                                 // If inbound
-                                if (transactionTypeID == 1)
+                                if (transactionTypeID == (int)TransactionTypeEnum.Inbound)
                                 {
                                     await _inventoryRepository.IncreaseInventory(inventoryID, item);
                                 }
-                                else if (transactionTypeID == 2)
+                                else if (transactionTypeID == (int)TransactionTypeEnum.Outbound)
                                 {
                                     await _inventoryRepository.DecreaseInventory(inventoryID, item);
                                 }
@@ -318,11 +319,11 @@ namespace Inventory_Management_Backend.Repository
                             // If the type is Outbound, throw an exception.
                             if (inventoryID == 0)
                             {
-                                if (transactionTypeID == 1)
+                                if (transactionTypeID == (int)TransactionTypeEnum.Inbound)
                                 {
                                     await _inventoryRepository.CreateInventory(item);
                                 }
-                                else if (transactionTypeID == 2)
+                                else if (transactionTypeID == (int)TransactionTypeEnum.Outbound)
                                 {
                                     throw new Exception("Inventory does not exist");
                                 }

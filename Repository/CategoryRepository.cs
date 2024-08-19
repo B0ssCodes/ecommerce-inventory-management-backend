@@ -130,17 +130,16 @@ namespace Inventory_Management_Backend.Repository
             {
                 var query = @"
             SELECT 
-                c.category_id_pkey AS CategoryID,
-                c.category_name AS CategoryName,
-                p.product_id_pkey AS ProductID,
-                p.sku AS SKU,
-                p.product_name AS Name,
-                p.product_description AS Description,
-                p.product_price AS Price,
-                p.product_cost_price AS Cost
-            FROM category c
-            LEFT JOIN product p ON c.category_id_pkey = p.category_id
-            WHERE c.category_id_pkey = @CategoryID AND p.deleted = false;";
+                category_id AS CategoryID,
+                category_name AS CategoryName,
+                product_id_pkey AS ProductID,
+                sku AS SKU,
+                product_name AS Name,
+                product_description AS Description,
+                product_price AS Price,
+                product_cost AS Cost
+            FROM product_mv
+            WHERE category_id = @CategoryID;";
 
                 var parameters = new { CategoryID = categoryID };
 
