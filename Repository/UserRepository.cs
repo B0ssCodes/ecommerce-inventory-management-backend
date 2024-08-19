@@ -67,7 +67,7 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task<(List<UserResponseDTO>, int itemCount)> GetUsers(PaginationParams paginationParams)
+        public async Task<(List<UserResponseDTO>, int itemCount)> GetUsers(bool showCanPurchase, PaginationParams paginationParams)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
@@ -76,8 +76,8 @@ namespace Inventory_Management_Backend.Repository
                 var offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
                 var searchQuery = paginationParams.Search;
 
-                // CTE to get total count of users
-                var query = @"
+                // Base query
+                var baseQuery = @"
         WITH UserCTE AS (
             SELECT 
                 u.user_id_pkey AS UserID,
@@ -92,7 +92,16 @@ namespace Inventory_Management_Backend.Repository
             WHERE (@SearchQuery IS NULL OR 
                    u.user_first_name ILIKE '%' || @SearchQuery || '%' OR 
                    u.user_last_name ILIKE '%' || @SearchQuery || '%' OR 
-                   u.user_email ILIKE '%' || @SearchQuery || '%')
+                   u.user_email ILIKE '%' || @SearchQuery || '%')";
+
+                // Add condition for CanPurchase permission if showCanPurchase is true
+                if (showCanPurchase)
+                {
+                    baseQuery += " AND r.can_purchase = true";
+                }
+
+                // Complete the query
+                var query = baseQuery + @"
         )
         SELECT UserID, FirstName, LastName, Email, UserRoleID, Role, UserCount
         FROM UserCTE
@@ -120,7 +129,7 @@ namespace Inventory_Management_Backend.Repository
                 return (users, totalCount);
             }
         }
-        
+
         public async Task UpdateUser(int userID, UserUpdateDTO updateDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())

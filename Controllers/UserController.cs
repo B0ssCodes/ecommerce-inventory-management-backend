@@ -24,12 +24,12 @@ namespace Inventory_Management_Backend.Controllers
 
         [HttpPost]
         //[Authorize]
-        [Route("get")]
-        public async Task<IActionResult> GetUsers(PaginationParams paginationParams)
+        [Route("get/{showCanPurchase}")]
+        public async Task<IActionResult> GetUsers(bool showCanPurchase, PaginationParams paginationParams)
         {
             try
             {
-                var (userResponseDTOs, itemCount) = await _userRepository.GetUsers(paginationParams);
+                var (userResponseDTOs, itemCount) = await _userRepository.GetUsers(showCanPurchase,paginationParams);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Users retrieved successfully";

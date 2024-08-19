@@ -4,6 +4,7 @@
     {
         public int UserRoleID { get; set; } 
         public string Role { get; set; }
+        public bool CanPurchase { get; set; }
         public List<AllUserPermissionResponseDTO> Permissions { get; set; }
     }
 }

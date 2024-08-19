@@ -27,7 +27,7 @@ namespace Inventory_Management_Backend.Repository
                 RETURNING user_role_id_pkey;";
 
                 var parameters = new { Name = requestDTO.RoleName };
-               int roleID = await connection.QuerySingleAsync<int>(query, parameters);
+                int roleID = await connection.QuerySingleAsync<int>(query, parameters);
 
                 if (roleID == 0)
                 {
@@ -51,7 +51,7 @@ namespace Inventory_Management_Backend.Repository
                         var associateParameters = new { UserRoleID = roleID, UserPermissionID = permissionID };
                         await connection.ExecuteAsync(associateQuery, associateParameters);
 
-                        
+
                     }
                 }
             }
@@ -72,7 +72,7 @@ namespace Inventory_Management_Backend.Repository
                     UPDATE user_info
                     SET deleted = true
                     WHERE user_role_id = @RoleID;";
-                var parameters = new { RoleID = roleId }; 
+                var parameters = new { RoleID = roleId };
                 await connection.ExecuteAsync(userQuery, parameters);
                 await connection.ExecuteAsync(query, parameters);
             }
@@ -85,6 +85,7 @@ namespace Inventory_Management_Backend.Repository
                 var query = @"
             SELECT ur.user_role_id_pkey AS UserRoleID,
                    ur.role AS Role,
+                   ur.can_purchase AS CanPurchase,
                    up.user_permission_id_pkey AS UserPermissionID,
                    up.permission AS Permission
             FROM user_role ur
@@ -182,11 +183,11 @@ namespace Inventory_Management_Backend.Repository
                         // Update the role name
                         var query = @"
                     UPDATE user_role
-                    SET role = @RoleName
+                    SET role = @RoleName, can_purchase = @CanPurchase
                     WHERE user_role_id_pkey = @Id
-                    RETURNING user_role_id_pkey as UserRoleID, role AS Role";
+                    RETURNING user_role_id_pkey as UserRoleID, role AS Role, can_purchase AS CanPurchase";
 
-                        var parameters = new { RoleName = requestDTO.RoleName, Id = roleId };
+                        var parameters = new { RoleName = requestDTO.RoleName, CanPurchase = requestDTO.CanPurchase, Id = roleId };
                         UserRoleDTO updatedUserRole = await connection.QueryFirstOrDefaultAsync<UserRoleDTO>(query, parameters, transaction);
 
                         if (updatedUserRole == null)
@@ -194,14 +195,14 @@ namespace Inventory_Management_Backend.Repository
                             throw new Exception("Failed to update user role");
                         }
 
- 
+
                         var deletePermissionsQuery = @"
                     DELETE FROM user_role_permission
                     WHERE user_role_id = @UserRoleID";
 
                         await connection.ExecuteAsync(deletePermissionsQuery, new { UserRoleID = roleId }, transaction);
 
-                       
+
                         if (requestDTO.Permissions != null)
                         {
                             foreach (var permission in requestDTO.Permissions)

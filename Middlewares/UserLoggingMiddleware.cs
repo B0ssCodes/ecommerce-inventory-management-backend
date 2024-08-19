@@ -146,6 +146,14 @@ public class UserLoggingMiddleware
                 {
                     beforeStateJson = JsonSerializer.Serialize(new { requested = $"{model} with id {id}" });
                 }
+                else
+                {
+                    using (var stream = new StreamReader(httpContext.Request.Body, Encoding.UTF8, leaveOpen: true))
+                    {
+                        beforeStateJson = await stream.ReadToEndAsync();
+                        httpContext.Request.Body.Position = 0;
+                    }
+                }
             }
             else
             {

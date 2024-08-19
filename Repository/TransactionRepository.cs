@@ -77,11 +77,11 @@ namespace Inventory_Management_Backend.Repository
                     WHERE transaction_id_pkey = @TransactionID";
 
                 await connection.ExecuteAsync(transactionDeleteQuery, transactionStatusParameters);
-                
+
             }
         }
 
-        public async Task<TransactionResponseDTO> GetTransaction(int transactionID)
+        public async Task<InboundTransactionResponseDTO> GetInboundTransaction(int transactionID)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
@@ -104,14 +104,14 @@ namespace Inventory_Management_Backend.Repository
                 JOIN vendor v ON t.vendor_id = v.vendor_id_pkey
                 JOIN transaction_type tt ON t.transaction_type_id = tt.transaction_type_id_pkey
                 JOIN transaction_status ts ON t.transaction_status_id = ts.transaction_status_id_pkey
-                WHERE t.transaction_id_pkey = @TransactionID;";
+                WHERE t.transaction_id_pkey = @TransactionID AND t.deleted = false;";
 
                     var transactionParameters = new
                     {
                         TransactionID = transactionID
                     };
 
-                    var transaction = await connection.QueryAsync<TransactionResponseDTO, VendorResponseDTO, TransactionResponseDTO>(
+                    var transaction = await connection.QueryAsync<InboundTransactionResponseDTO, VendorResponseDTO, InboundTransactionResponseDTO>(
                         transactionQuery,
                         (transaction, vendor) =>
                         {
@@ -162,6 +162,88 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
+        public async Task<OutboundTransactionResponseDTO> GetOutboundTransaction(int transactionID)
+        {
+            using (IDbConnection connection = _db.CreateConnection())
+            {
+                connection.Open();
+                using (var transactionScope = connection.BeginTransaction())
+                {
+                    var transactionQuery = @"
+                SELECT t.transaction_id_pkey AS TransactionID,
+                       t.transaction_amount AS Amount,
+                       t.transaction_date AS Date,
+                       tt.type AS TransactionType,
+                       ts.status AS TransactionStatus,
+                       u.user_id_pkey AS UserID,
+                       u.user_first_name AS FirstName,
+                       u.user_last_name AS LastName,
+                       u.user_email AS Email,
+                       ur.user_role_id_pkey AS UserRoleID,
+                       ur.role AS Role
+                FROM transaction t
+                JOIN user_info u ON t.vendor_id = u.user_id_pkey
+                JOIN user_role ur ON u.user_role_id = ur.user_role_id_pkey
+                JOIN transaction_type tt ON t.transaction_type_id = tt.transaction_type_id_pkey
+                JOIN transaction_status ts ON t.transaction_status_id = ts.transaction_status_id_pkey
+                WHERE t.transaction_id_pkey = @TransactionID AND t.deleted = false;";
+
+                    var transactionParameters = new
+                    {
+                        TransactionID = transactionID
+                    };
+
+                    var transaction = await connection.QueryAsync<OutboundTransactionResponseDTO, UserResponseDTO, OutboundTransactionResponseDTO>(
+                        transactionQuery,
+                        (transaction, vendor) =>
+                        {
+                            transaction.User = vendor;
+                            return transaction;
+                        },
+                        transactionParameters,
+                        transactionScope,
+                        splitOn: "UserID"
+                    );
+
+                    var transactionResponse = transaction.FirstOrDefault();
+
+                    if (transactionResponse == null)
+                    {
+                        throw new Exception("Transaction not found");
+                    }
+
+                    var transactionItemsQuery = @"
+                SELECT ti.transaction_item_id_pkey AS TransactionItemID,
+                       ti.product_id AS ProductID,
+                       ti.transaction_item_quantity AS Quantity,
+                       ti.transaction_item_price AS Price,
+                       p.product_id_pkey AS ProductID,
+                       p.sku AS SKU,
+                       p.product_name AS Name
+                FROM transaction_item ti
+                JOIN product p ON ti.product_id = p.product_id_pkey
+                WHERE ti.transaction_id = @TransactionID;";
+
+                    var transactionItems = await connection.QueryAsync<TransactionItemResponseDTO, ShortProductResponseDTO, TransactionItemResponseDTO>(
+                        transactionItemsQuery,
+                        (item, product) =>
+                        {
+                            item.Product = product;
+                            return item;
+                        },
+                        new { TransactionID = transactionID },
+                        transactionScope,
+                        splitOn: "ProductID"
+                    );
+
+                    transactionResponse.TransactionItems = transactionItems.ToList();
+
+                    transactionScope.Commit();
+                    return transactionResponse;
+                }
+            }
+        }
+
 
         public async Task<(List<AllTransactionResponseDTO>, int)> GetTransactions(string? vendorEmail, PaginationParams paginationParams)
         {
@@ -170,7 +252,7 @@ namespace Inventory_Management_Backend.Repository
                 connection.Open();
 
                 // Base query
-                var baseQuery = @"
+                var transactionsQuery = @"
         WITH TransactionCTE AS (
             SELECT 
                 t.transaction_id_pkey AS TransactionID,
@@ -179,32 +261,26 @@ namespace Inventory_Management_Backend.Repository
                 tt.transaction_type_id_pkey AS TypeID,
                 tt.type AS Type,
                 ts.status AS Status,
-                v.vendor_id_pkey AS VendorID,
-                v.vendor_name AS Name,
+                CASE 
+                    WHEN tt.transaction_type_id_pkey = 1 THEN v.vendor_email
+                    ELSE u.user_email
+                END AS Email,
                 COUNT(*) OVER() AS TotalCount
             FROM transaction t
-            JOIN vendor v ON t.vendor_id = v.vendor_id_pkey
             JOIN transaction_type tt ON t.transaction_type_id = tt.transaction_type_id_pkey
             JOIN transaction_status ts ON t.transaction_status_id = ts.transaction_status_id_pkey
+            LEFT JOIN vendor v ON t.vendor_id = v.vendor_id_pkey AND tt.transaction_type_id_pkey = 1
+            LEFT JOIN user_info u ON t.vendor_id = u.user_id_pkey AND tt.transaction_type_id_pkey = 2
             WHERE (@Search IS NULL OR 
                    t.transaction_amount::TEXT ILIKE '%' || @Search || '%' OR
                    t.transaction_date::TEXT ILIKE '%' || @Search || '%' OR
                    tt.type ILIKE '%' || @Search || '%' OR
                    ts.status ILIKE '%' || @Search || '%' OR
-                   v.vendor_name ILIKE '%' || @Search || '%')
+                   v.vendor_name ILIKE '%' || @Search || '%' OR
+                   u.user_email ILIKE '%' || @Search || '%')
             AND t.deleted = false
-          ";
-
-                // Add vendor ID conditionally
-                if (vendorEmail != null)
-                {
-                    baseQuery += " AND v.vendor_email = @VendorEmail";
-                }
-
-                // Complete the query
-                var transactionsQuery = baseQuery + @"
         )
-        SELECT TransactionID, Amount, Date, TypeID, Type, Status, VendorID, Name, TotalCount
+        SELECT TransactionID, Amount, Date, TypeID, Type, Status, Email, TotalCount
         FROM TransactionCTE
         ORDER BY Date DESC
         OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
@@ -217,24 +293,22 @@ namespace Inventory_Management_Backend.Repository
                     Search = paginationParams.Search
                 };
 
-                var result = await connection.QueryAsync<AllTransactionResponseDTO, ShortVendorResponseDTO, long, (AllTransactionResponseDTO, long)>(
+                var result = await connection.QueryAsync<AllTransactionResponseDTO, long, (AllTransactionResponseDTO, long)>(
                     transactionsQuery,
-                    (transaction, vendor, totalCount) =>
+                    (transaction, totalCount) =>
                     {
-                        transaction.Vendor = vendor;
                         return (transaction, totalCount);
                     },
                     parameters,
-                    splitOn: "VendorID, TotalCount"
+                    splitOn: "TotalCount"
                 );
 
                 var transactions = result.Select(r => r.Item1).ToList();
-                int totalCount = result.Any() ? (int)result.First().Item2 : 0; // Explicitly cast to int, had an int64 error before
+                int totalCount = result.Any() ? (int)result.First().Item2 : 0;
 
                 return (transactions, totalCount);
             }
         }
-
         public async Task SubmitTransaction(TransactionSubmitDTO transactionDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())

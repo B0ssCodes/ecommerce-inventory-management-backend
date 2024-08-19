@@ -8,6 +8,6 @@
         public int TypeID { get; set; }
         public string Type { get; set; }
         public string Status { get; set; }
-        public ShortVendorResponseDTO Vendor { get; set; }
+        public string Email { get; set; }
     }
 }

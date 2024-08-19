@@ -1,6 +1,7 @@
 ﻿using Inventory_Management_Backend.Models;
 using Inventory_Management_Backend.Models.Dto;
 using Inventory_Management_Backend.Repository.IRepository;
+using Inventory_Management_Backend.Utilities.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -52,16 +53,28 @@ namespace Inventory_Management_Backend.Controllers
       
         [HttpGet]
         [Authorize]
-        [Route("get/{transactionID}")]
-        public async Task<IActionResult> GetTransaction(int transactionID)
+        [Route("get/{transactionID}/{transactionTypeID}")]
+        public async Task<IActionResult> GetTransaction(int transactionID, int transactionTypeID)
         {
             try
             {
-                var transaction = await _transactionRepository.GetTransaction(transactionID);
-                _response.StatusCode = HttpStatusCode.OK;
-                _response.IsSuccess = true;
-                _response.Message = "Transaction fetched successfully";
-                _response.Result = transaction;
+                if (transactionTypeID == (int)TransactionTypeEnum.Inbound)
+                {
+                    var transaction = await _transactionRepository.GetInboundTransaction(transactionID);
+                    _response.StatusCode = HttpStatusCode.OK;
+                    _response.IsSuccess = true;
+                    _response.Message = "Transaction fetched successfully";
+                    _response.Result = transaction;
+                }
+                else if (transactionTypeID == (int)TransactionTypeEnum.Outbound)
+                {
+                    var transaction = await _transactionRepository.GetOutboundTransaction(transactionID);
+                    _response.StatusCode = HttpStatusCode.OK;
+                    _response.IsSuccess = true;
+                    _response.Message = "Transaction fetched successfully";
+                    _response.Result = transaction;
+                }
+                
                 return Ok(_response);
             }
             catch (Exception ex)
