@@ -80,7 +80,7 @@ namespace Inventory_Management_Backend.Repository
                 var offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
                 var searchQuery = paginationParams.Search;
 
-                var query = @"
+                var baseQuery = @"
                     WITH FilteredLogs AS (
                         SELECT 
                             user_log_id_pkey AS LogID,
@@ -115,7 +115,7 @@ namespace Inventory_Management_Backend.Repository
                 };
 
                 var result = await connection.QueryAsync<AllUserLogResponseDTO, long, (AllUserLogResponseDTO, long)>(
-                    query,
+                    baseQuery,
                     (log, totalCount) => (log, totalCount),
                     parameters,
                     splitOn: "TotalCount"

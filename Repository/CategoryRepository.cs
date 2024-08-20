@@ -61,23 +61,59 @@ namespace Inventory_Management_Backend.Repository
                 var offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
                 var searchQuery = paginationParams.Search;
 
-                var query = @"
-            WITH CategoryCTE AS (
-                SELECT 
-                    category_id_pkey AS CategoryID, 
-                    category_name AS Name, 
-                    category_description AS Description,
-                    COUNT(*) OVER() AS TotalCount
-                FROM category
-                WHERE (@SearchQuery IS NULL OR 
-                       category_name ILIKE '%' || @SearchQuery || '%' OR 
-                       category_description ILIKE '%' || @SearchQuery || '%')
-            )
-            SELECT CategoryID, Name, Description, TotalCount
-            FROM CategoryCTE
-            ORDER BY Name
-            OFFSET @Offset ROWS
-            FETCH NEXT @PageSize ROWS ONLY;";
+                // Define the mapping between frontend field names and database field names
+                var fieldMapping = new Dictionary<string, string>
+        {
+            { "name", "category_name" },
+            { "description", "category_description" },
+            // Add other mappings as needed
+        };
+
+                var baseQuery = @"
+        WITH CategoryCTE AS (
+            SELECT 
+                category_id_pkey AS CategoryID, 
+                category_name AS Name, 
+                category_description AS Description,
+                COUNT(*) OVER() AS TotalCount
+            FROM category
+            WHERE (@SearchQuery IS NULL OR 
+                   category_name ILIKE '%' || @SearchQuery || '%' OR 
+                   category_description ILIKE '%' || @SearchQuery || '%')
+
+        ";
+
+                // Add dynamic filters
+                if (paginationParams.Filters != null && paginationParams.Filters.Count > 0)
+                {
+                    foreach (Filter filter in paginationParams.Filters)
+                    {
+                        string field = "";
+                        if (fieldMapping.ContainsKey(filter.Field.ToLower()))
+                        {
+                            field = fieldMapping[filter.Field.ToLower()];
+                        }
+
+                        // Use parameterized queries to safely include the value
+                        baseQuery += $" AND {field} {filter.Operator} '{filter.Value}'";
+                    }
+                }
+
+                baseQuery += @")
+        SELECT CategoryID, Name, Description, TotalCount
+        FROM CategoryCTE";
+
+                if (paginationParams.SortBy != null)
+                {
+                    string sortBy = char.ToUpper(paginationParams.SortBy[0]) + paginationParams.SortBy.Substring(1);
+                    baseQuery += " ORDER BY " + sortBy + " " + (paginationParams.SortOrder == "asc" ? "ASC" : "DESC");
+                }
+                else
+                {
+                    baseQuery += " ORDER BY Name";
+                }
+
+                baseQuery += " OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
 
                 var parameters = new
                 {
@@ -87,7 +123,7 @@ namespace Inventory_Management_Backend.Repository
                 };
 
                 var result = await connection.QueryAsync<CategoryResponseDTO, long, (CategoryResponseDTO, long)>(
-                    query,
+                    baseQuery,
                     (category, totalCount) => (category, totalCount),
                     parameters,
                     splitOn: "TotalCount"

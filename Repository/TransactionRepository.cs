@@ -251,8 +251,19 @@ namespace Inventory_Management_Backend.Repository
             {
                 connection.Open();
 
+                // Define the mapping between frontend field names and database field names
+                var fieldMapping = new Dictionary<string, string>
+        {
+            { "amount", "t.transaction_amount" },
+            { "date", "t.transaction_date" },
+            { "type", "tt.type" },
+            { "status", "ts.status" },
+            { "email", "CASE WHEN tt.transaction_type_id_pkey = 1 THEN v.vendor_email ELSE u.user_email END" },
+            // Add other mappings as needed
+        };
+
                 // Base query
-                var transactionsQuery = @"
+                var baseQuery = @"
         WITH TransactionCTE AS (
             SELECT 
                 t.transaction_id_pkey AS TransactionID,
@@ -278,12 +289,46 @@ namespace Inventory_Management_Backend.Repository
                    ts.status ILIKE '%' || @Search || '%' OR
                    v.vendor_name ILIKE '%' || @Search || '%' OR
                    u.user_email ILIKE '%' || @Search || '%')
-            AND t.deleted = false
-        )
-        SELECT TransactionID, Amount, Date, TypeID, Type, Status, Email, TotalCount
-        FROM TransactionCTE
-        ORDER BY Date DESC
-        OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
+            AND t.deleted = false";
+
+                // If a vendor email is passed, add it as a condition
+                if (!string.IsNullOrEmpty(vendorEmail))
+                {
+                    baseQuery += " AND v.vendor_email = @VendorEmail";
+                }
+
+                // Add dynamic filters
+                if (paginationParams.Filters != null && paginationParams.Filters.Count > 0)
+                {
+                    foreach (Filter filter in paginationParams.Filters)
+                    {
+                        string field = "";
+                        if (fieldMapping.ContainsKey(filter.Field.ToLower()))
+                        {
+                            field = fieldMapping[filter.Field.ToLower()];
+                        }
+
+                        // Use parameterized queries to safely include the value
+                        
+                        baseQuery += $" AND {field} {filter.Operator} '{filter.Value}'";
+                    }
+                }
+
+                var transactionsQuery = baseQuery + @")
+             SELECT TransactionID, Amount, Date, TypeID, Type, Status, Email, TotalCount
+             FROM TransactionCTE
+             ";
+                if (paginationParams.SortBy != null)
+                {
+                    string sortBy = char.ToUpper(paginationParams.SortBy[0]) + paginationParams.SortBy.Substring(1);
+                    transactionsQuery += " ORDER BY " + sortBy + " " + (paginationParams.SortOrder == "asc" ? "ASC" : "DESC");
+                }
+                else
+                {
+                    transactionsQuery += " ORDER BY TransactionID DESC";
+                }
+
+                transactionsQuery += " OFFSET @Offset FETCH NEXT @PageSize ROWS ONLY";
 
                 var parameters = new
                 {
