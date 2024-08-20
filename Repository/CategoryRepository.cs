@@ -66,7 +66,6 @@ namespace Inventory_Management_Backend.Repository
         {
             { "name", "category_name" },
             { "description", "category_description" },
-            // Add other mappings as needed
         };
 
                 var baseQuery = @"

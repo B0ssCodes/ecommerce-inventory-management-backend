@@ -224,8 +224,19 @@ namespace Inventory_Management_Backend.Repository
                 connection.Open(); // Explicitly open the connection
 
                 var offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
+                var searchQuery = paginationParams.Search;
 
-                var query = @"
+                // Define the mapping between frontend field names and database field names
+                var fieldMapping = new Dictionary<string, string>
+        {
+            { "name", "p.product_name" },
+            { "sku", "p.sku" },
+            { "description", "p.product_description" },
+            { "price", "p.product_price" },
+            { "cost", "p.product_cost_price" }
+        };
+
+                var baseQuery = @"
         WITH ProductCTE AS (
             SELECT 
                 p.product_id_pkey AS ProductID, 
@@ -242,22 +253,49 @@ namespace Inventory_Management_Backend.Repository
                    OR p.product_description ILIKE '%' || @SearchQuery || '%' 
                    OR p.sku ILIKE '%' || @SearchQuery || '%')
             AND deleted = false
-        )
+        ";
+
+                // Add dynamic filters
+                if (paginationParams.Filters != null && paginationParams.Filters.Count > 0)
+                {
+                    foreach (Filter filter in paginationParams.Filters)
+                    {
+                        string field = "";
+                        if (fieldMapping.ContainsKey(filter.Field.ToLower()))
+                        {
+                            field = fieldMapping[filter.Field.ToLower()];
+                        }
+
+                        // Use parameterized queries to safely include the value
+                        baseQuery += $" AND {field} {filter.Operator} '{filter.Value}'";
+                    }
+                }
+
+                baseQuery += @")
         SELECT ProductID, SKU, Name, Description, Price, Cost, CategoryID, ImageCount, TotalCount
-        FROM ProductCTE
-        ORDER BY ProductID DESC
-        OFFSET @Offset ROWS
-        FETCH NEXT @PageSize ROWS ONLY;";
+        FROM ProductCTE";
+
+                if (paginationParams.SortBy != null)
+                {
+                    string sortBy = char.ToUpper(paginationParams.SortBy[0]) + paginationParams.SortBy.Substring(1);
+                    baseQuery += " ORDER BY " + sortBy + " " + (paginationParams.SortOrder == "asc" ? "ASC" : "DESC");
+                }
+                else
+                {
+                    baseQuery += " ORDER BY ProductID DESC";
+                }
+
+                baseQuery += " OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
 
                 var parameters = new
                 {
                     Offset = offset,
                     PageSize = paginationParams.PageSize,
-                    SearchQuery = paginationParams.Search
+                    SearchQuery = searchQuery
                 };
 
                 var result = await connection.QueryAsync<AllProductResponseDTO, long, (AllProductResponseDTO, long)>(
-                    query,
+                    baseQuery,
                     (product, totalCount) => (product, totalCount),
                     parameters,
                     splitOn: "TotalCount"

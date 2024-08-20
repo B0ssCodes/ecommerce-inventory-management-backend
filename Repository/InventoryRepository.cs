@@ -137,46 +137,84 @@ namespace Inventory_Management_Backend.Repository
                 connection.Open();
 
                 var offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
-                var query = @"
-                 WITH InventoryCTE AS (
-                    SELECT i.inventory_id_pkey AS InventoryID,
-                           i.inventory_stock AS Quantity,
-                           i.inventory_cost AS Price,
-                           p.product_name AS ProductName,
-                           p.sku AS ProductSKU,
-                           p.product_cost_price AS ProductPrice,
-                           COUNT (*) OVER() AS TotalCount
-                    FROM inventory i
-                    JOIN product p ON i.product_id = p.product_id_pkey
-                    WHERE (@SearchQuery IS NULL OR p.product_name ILIKE '%' || @SearchQuery || '%'
-                            OR p.sku ILIKE '%' || @SearchQuery || '%'
-                            OR CAST(i.inventory_stock AS TEXT) ILIKE '%' || @SearchQuery || '%')
-                    )
-                    SELECT InventoryID, Quantity, Price, ProductName, ProductSKU, ProductPrice, TotalCount
-                    FROM InventoryCTE
-                    ORDER BY InventoryID DESC
-                    OFFSET @Offset ROWS
-                    FETCH NEXT @PageSize ROWS ONLY;";
+                var searchQuery = paginationParams.Search;
+
+                // Define the mapping between frontend field names and database field names
+                var fieldMapping = new Dictionary<string, string>
+        {
+            { "quantity", "inventory_stock" },
+            { "price", "inventory_cost" },
+            { "productName", "product_name" },
+            { "productSKU", "sku" },
+            { "productPrice", "product_cost_price" }
+        };
+
+                var baseQuery = @"
+        WITH InventoryCTE AS (
+            SELECT i.inventory_id_pkey AS InventoryID,
+                   i.inventory_stock AS Quantity,
+                   i.inventory_cost AS Price,
+                   p.product_name AS ProductName,
+                   p.sku AS ProductSKU,
+                   p.product_cost_price AS ProductPrice,
+                   COUNT(*) OVER() AS TotalCount
+            FROM inventory i
+            JOIN product p ON i.product_id = p.product_id_pkey
+            WHERE (@SearchQuery IS NULL OR p.product_name ILIKE '%' || @SearchQuery || '%'
+                    OR p.sku ILIKE '%' || @SearchQuery || '%'
+                    OR CAST(i.inventory_stock AS TEXT) ILIKE '%' || @SearchQuery || '%')
+        ";
+
+                // Add dynamic filters
+                if (paginationParams.Filters != null && paginationParams.Filters.Count > 0)
+                {
+                    foreach (Filter filter in paginationParams.Filters)
+                    {
+                        string field = "";
+                        if (fieldMapping.ContainsKey(filter.Field.ToLower()))
+                        {
+                            field = fieldMapping[filter.Field.ToLower()];
+                        }
+
+                        // Use parameterized queries to safely include the value
+                        baseQuery += $" AND {field} {filter.Operator} '{filter.Value}'";
+                    }
+                }
+
+                baseQuery += @")
+        SELECT InventoryID, Quantity, Price, ProductName, ProductSKU, ProductPrice, TotalCount
+        FROM InventoryCTE";
+
+                if (paginationParams.SortBy != null)
+                {
+                    string sortBy = char.ToUpper(paginationParams.SortBy[0]) + paginationParams.SortBy.Substring(1);
+                    baseQuery += " ORDER BY " + sortBy + " " + (paginationParams.SortOrder == "asc" ? "ASC" : "DESC");
+                }
+                else
+                {
+                    baseQuery += " ORDER BY InventoryID DESC";
+                }
+
+                baseQuery += " OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
 
                 var parameters = new
                 {
                     Offset = offset,
                     PageSize = paginationParams.PageSize,
-                    SearchQuery = paginationParams.Search
+                    SearchQuery = searchQuery
                 };
 
                 var result = await connection.QueryAsync<AllInventoryResponseDTO, long, (AllInventoryResponseDTO, long)>(
-                    query,
+                    baseQuery,
                     (inventory, totalCount) => (inventory, totalCount),
                     parameters,
                     splitOn: "TotalCount"
-                    );
+                );
 
                 var inventories = result.Select(x => x.Item1).ToList();
-                var totalCount = (int)result.FirstOrDefault().Item2;
+                var totalCount = result.Any() ? (int)result.First().Item2 : 0; // Explicitly cast to int
 
-                return (inventories, (int)totalCount);
-                           
+                return (inventories, totalCount);
             }
         }
 
