@@ -23,7 +23,7 @@ namespace Inventory_Management_Backend.Repository.IRepository
         public Task<int> GetOutStockInventoriesCount();
 
         // Creates a new inventory based on the product ID
-        public Task<int> CreateInventory(TransactionItemRequestDTO requestDTO);
+        public Task<int> CreateInventory(int productID);
 
         // Increases the inventory based on the inventory ID (if transaction type is Inbound)
         public Task IncreaseInventory(int inventoryID,TransactionItemRequestDTO requestDTO);
@@ -31,7 +31,7 @@ namespace Inventory_Management_Backend.Repository.IRepository
         // Decreases the inventory based on the inventory ID (if transaction type is Outbounf)
         public Task DecreaseInventory(int inventoryID, TransactionItemRequestDTO requestDTO);
 
-        // Deletes the inventory based on the inventory ID (happens when quantity = 0)
+        // Deletes the inventory based on the inventory ID (happens when quantity = 0) 
         public Task DeleteInventory(int inventoryID);
     }
 }

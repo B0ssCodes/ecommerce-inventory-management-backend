@@ -17,11 +17,14 @@ namespace Inventory_Management_Backend.Repository
             _roomRepository = roomRepository;
         }
 
+        // This method will be called from the warehouse repository
         public async Task CreateFloor(int warehouseID, WarehouseFloorRequestDTO requestDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
                 connection.Open();
+
+                // Create a new floor in the warehouse
                 string createQuery = @"
                     INSERT INTO warehouse_floor (floor_name, warehouse_id)
                     VALUES (@FloorName, @WarehouseID)
@@ -37,6 +40,7 @@ namespace Inventory_Management_Backend.Repository
                 }
                 else
                 {
+                    // If the floor has rooms, add them
                     if (requestDTO.Rooms != null && requestDTO.Rooms.Count > 0)
                     {
                         foreach (var room in requestDTO.Rooms)

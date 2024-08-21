@@ -23,13 +23,14 @@ namespace Inventory_Management_Backend.Repository
             using (IDbConnection connection = _db.CreateConnection())
             {
                 connection.Open();
-
+                
+                // Insert the warehouse's name and address first then return the new warehouse's ID
                 string createQuery = @"
-                    INSERT INTO warehouse (warehouse_name)
-                    VALUES (@WarehouseName)
+                    INSERT INTO warehouse (warehouse_name, warehouse_address)
+                    VALUES (@WarehouseName, @WarehouseAddress)
                     RETURNING warehouse_id_pkey;";
 
-                var parameters = new { WarehouseName = requestDTO.Name };
+                var parameters = new { WarehouseName = requestDTO.WarehouseName, WarehouseAddress = requestDTO.WarehouseAddress };
 
                 int warehouseID = await connection.QueryFirstOrDefaultAsync<int>(createQuery, parameters);
 
@@ -38,6 +39,7 @@ namespace Inventory_Management_Backend.Repository
                     throw new Exception("Failed to create warehouse");
                 }
 
+                // If the warehouse has floors, create them
                 if (requestDTO.Floors != null && requestDTO.Floors.Count > 0)
                 {
                     foreach (var floor in requestDTO.Floors)
@@ -133,7 +135,7 @@ namespace Inventory_Management_Backend.Repository
                         warehouse_address = @WarehouseAddress
                     WHERE warehouse_id_pkey = @WarehouseID";
 
-                var parameters = new { WarehouseName = requestDTO.Name, WarehouseAddress = requestDTO.Address, WarehouseID = warehouseID };
+                var parameters = new { WarehouseName = requestDTO.WarehouseName, WarehouseAddress = requestDTO.WarehouseAddress, WarehouseID = warehouseID };
 
                 await connection.ExecuteAsync(updateQuery, parameters);
             }

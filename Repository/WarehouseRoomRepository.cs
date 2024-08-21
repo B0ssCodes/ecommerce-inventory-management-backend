@@ -16,11 +16,15 @@ namespace Inventory_Management_Backend.Repository
             _db = db;
             _aisleRepository = aisleRepository;
         }
+
+        // This method will be called from the floor repository to create a room
         public async Task CreateRoom(int floorID, WarehouseRoomRequestDTO requestDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
                 connection.Open();
+
+                // Create the room on the floor and the its ID
                 string createQuery = @"
                     INSERT INTO warehouse_room (room_name, warehouse_floor_id_pkey)
                     VALUES (@RoomName, @FloorID)
@@ -36,6 +40,7 @@ namespace Inventory_Management_Backend.Repository
                 }
                 else
                 {
+                    // If the room has aisles, create them
                     if (requestDTO.Aisles != null && requestDTO.Aisles.Count > 0)
                     {
                         foreach (var aisle in requestDTO.Aisles)

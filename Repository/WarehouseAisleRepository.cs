@@ -15,11 +15,15 @@ namespace Inventory_Management_Backend.Repository
             _db = db;
             _shelfRepository = shelfRepository;
         }
+
+        // This method will be called from the room repository
         public async Task CreateAisle(int roomID, WarehouseAisleRequestDTO requestDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
                 connection.Open();
+                
+                // Create the aisle in the room and return the aisleID
                 string createQuery = @"
                         INSERT INTO warehouse_aisle (aisle_name, warehouse_room_id)
                         VALUES (@AisleName, @RoomID)
@@ -35,6 +39,7 @@ namespace Inventory_Management_Backend.Repository
                 }
                 else
                 {
+                    // If the aisle has shelves, create them
                     if (requestDTO.Shelves != null && requestDTO.Shelves.Count > 0)
                     {
                         foreach (var shelf in requestDTO.Shelves)

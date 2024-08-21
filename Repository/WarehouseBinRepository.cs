@@ -16,12 +16,14 @@ namespace Inventory_Management_Backend.Repository
             _db = db;
         }
 
+        // This method will be called from the shelf repository
         public async Task CreateBin(int shelfID, WarehouseBinRequestDTO requestDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
                 connection.Open();
 
+                // Create the bin in the shelf
                 string query = @"
                         INSERT INTO warehouse_bin (bin_name, bin_capacity, warehouse_shelf_id)
                         VALUES (@BinName, @BinCapacity, @ShelfID);";
@@ -47,7 +49,8 @@ namespace Inventory_Management_Backend.Repository
                         SELECT COUNT(*) AS ItemCount
                         FROM inventory i 
                         JOIN inventory_location il 
-                        ON i.inventory_location_id= il.inventory_location_id_pkey";
+                        ON i.inventory_location_id= il.inventory_location_id_pkey
+                        WHERE i.inventory_stock > 0";
 
                 if (binID != null)
                 {

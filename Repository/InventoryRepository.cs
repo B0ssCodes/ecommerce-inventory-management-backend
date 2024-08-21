@@ -38,7 +38,7 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task<int> CreateInventory(TransactionItemRequestDTO requestDTO)
+        public async Task<int> CreateInventory(int productID)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
@@ -51,9 +51,9 @@ namespace Inventory_Management_Backend.Repository
 
                 int result = await connection.QueryFirstOrDefaultAsync<int>(query, new
                 {
-                    Quantity = requestDTO.Quantity,
-                    Price = requestDTO.Price,
-                    ProductID = requestDTO.ProductID
+                    Quantity = 0,
+                    Price = 0,
+                    ProductID = productID
                 });
 
                 return result;
@@ -86,7 +86,15 @@ namespace Inventory_Management_Backend.Repository
                     // If the quantity in stock is equal to the quantity requested, delete the inventory
                     if (quantity == requestDTO.Quantity)
                     {
-                        await DeleteInventory(inventoryID);
+                        var query = @"
+                            UPDATE inventory
+                            SET inventory_stock = @Quantity,
+                                inventory_cost = @Price
+                            WHERE inventory_id_pkey = @InventoryID;";
+
+                        var parameters = new { Quantity = 0, Price = 0, InventoryID = inventoryID };
+
+                        await connection.ExecuteAsync(query, parameters, transaction);
                     }
 
                     // If the quantity in stock is greater than the quantity requested, decrease the inventory
@@ -107,9 +115,9 @@ namespace Inventory_Management_Backend.Repository
 
                         await connection.ExecuteAsync(query, parameters, transaction);
 
-                        transaction.Commit();
-
                     }
+
+                    transaction.Commit();
                 }
             }
         }
@@ -338,7 +346,7 @@ namespace Inventory_Management_Backend.Repository
                        COUNT(*) OVER() AS TotalCount
                 FROM product p
                 LEFT JOIN inventory i ON p.product_id_pkey = i.product_id
-                WHERE i.product_id IS NULL
+                WHERE i.inventory_stock = 0 OR i.inventory_stock IS NULL
                   AND (@SearchQuery IS NULL OR p.product_name ILIKE '%' || @SearchQuery || '%'
                        OR p.sku ILIKE '%' || @SearchQuery || '%'
                        OR CAST(p.product_cost_price AS TEXT) ILIKE '%' || @SearchQuery || '%')
@@ -375,9 +383,9 @@ namespace Inventory_Management_Backend.Repository
             using (IDbConnection connection = _db.CreateConnection())
             {
                 var query = @"
-                SELECT COUNT(*) OVER()
-                FROM inventory
-                WHERE inventory_stock < @MinStockQuantity;";
+                    SELECT COUNT(*) OVER()
+                    FROM inventory
+                    WHERE inventory_stock < @MinStockQuantity;";
 
                 var parameters = new { MinStockQuantity = minStockQuantity };
 
@@ -394,10 +402,10 @@ namespace Inventory_Management_Backend.Repository
                 connection.Open();
 
                 var query = @"
-            SELECT COUNT(*)
-            FROM product p
-            LEFT JOIN inventory i ON p.product_id_pkey = i.product_id
-            WHERE i.product_id IS NULL;";
+                    SELECT COUNT(*)
+                    FROM product p
+                    LEFT JOIN inventory i ON p.product_id_pkey = i.product_id
+                    WHERE i.inventory_stock = 0 OR i.inventory_stock IS NULL;";
 
                 int result = await connection.QueryFirstOrDefaultAsync<int>(query);
 

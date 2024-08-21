@@ -2,8 +2,8 @@
 {
     public class WarehouseRequestDTO
     {
-        public string Name { get; set; }
-        public string Address { get; set; }
+        public string WarehouseName { get; set; }
+        public string WarehouseAddress { get; set; }
         public List<WarehouseFloorRequestDTO>? Floors { get; set; }
     }
 }

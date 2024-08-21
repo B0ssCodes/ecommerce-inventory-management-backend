@@ -17,12 +17,14 @@ namespace Inventory_Management_Backend.Repository
             _warehouseBinRepository = warehouseBinRepository;
         }
 
+        // This method will be called from the aisle repository
         public async Task CreateShelf(int aisleID, WarehouseShelfRequestDTO requestDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
                 connection.Open();
 
+                // Create the shelf in the aisle and return the shelfID
                 var query = @"
                     INSERT INTO warehouse_shelf (shelf_name, warehouse_aisle_id)
                     VALUES (@ShelfName, @AisleID)
@@ -42,6 +44,7 @@ namespace Inventory_Management_Backend.Repository
                 }
                 else
                 {
+                    // If the shelf has bins, create them
                     if (requestDTO.Bins != null && requestDTO.Bins.Count > 0)
                     {
                         foreach(var bin in requestDTO.Bins)
