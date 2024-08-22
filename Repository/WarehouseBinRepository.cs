@@ -17,25 +17,55 @@ namespace Inventory_Management_Backend.Repository
         }
 
         // This method will be called from the shelf repository
-        public async Task CreateBin(int shelfID, WarehouseBinRequestDTO requestDTO)
+        public async Task CreateBin(int shelfID, WarehouseBinRequestDTO requestDTO, IDbConnection? connection, IDbTransaction? transaction)
         {
-            using (IDbConnection connection = _db.CreateConnection())
+            bool isNewConnection = false;
+            bool isNewTransaction = false;
+            if (connection == null)
+            {
+                connection = _db.CreateConnection();
+                isNewConnection = true;
+            }
+            if (transaction == null)
             {
                 connection.Open();
+                transaction = connection.BeginTransaction();
+                isNewTransaction = true;
+            }
 
+            try
+            {
                 // Create the bin in the shelf
                 string query = @"
-                        INSERT INTO warehouse_bin (bin_name, bin_capacity, warehouse_shelf_id)
-                        VALUES (@BinName, @BinCapacity, @ShelfID);";
-                var parameters = new 
-                { 
-                    BinName = requestDTO.BinName, 
-                    BinCapacity = requestDTO.BinCapacity, 
+                INSERT INTO warehouse_bin (bin_name, bin_capacity, warehouse_shelf_id)
+                VALUES (@BinName, @BinCapacity, @ShelfID);";
+                var parameters = new
+                {
+                    BinName = requestDTO.BinName,
+                    BinCapacity = requestDTO.BinCapacity,
                     ShelfID = shelfID
                 };
 
-                await connection.ExecuteAsync(query, parameters);
+                await connection.ExecuteAsync(query, parameters, transaction);
 
+            }
+            catch (Exception ex)
+            {
+                // Rollback the transaction if any error occurs
+                transaction.Rollback();
+                throw new Exception("Transaction failed and rolled back", ex);
+            }
+            finally
+            {
+                if (isNewTransaction)
+                {
+                    transaction.Commit();
+                    transaction.Dispose();
+                }
+                if (isNewConnection)
+                {
+                    connection.Close();
+                }
             }
         }
 
@@ -103,13 +133,13 @@ namespace Inventory_Management_Backend.Repository
                 b.warehouse_bin_id_pkey AS BinID,
                 b.bin_name AS BinName,
                 b.bin_capacity AS BinCapacity,
-                COALESCE(SUM(i.inventory_stock), 0) AS BinCurrentStock,
+                COALESCE(SUM(i.inventory_stock), 0) AS BinCurrentStock
             FROM 
                 warehouse_bin b
             LEFT JOIN 
                 inventory_location il ON il.warehouse_bin_id = b.warehouse_bin_id_pkey
             LEFT JOIN 
-                inventory i ON i.inventory_location_id = il.inventory_location_id_pkey
+                inventory i ON i.inventory_id = il.inventory_id
             WHERE 
                 b.warehouse_bin_id_pkey = @BinID
             GROUP BY 
@@ -139,17 +169,17 @@ namespace Inventory_Management_Backend.Repository
                 b.warehouse_bin_id_pkey AS BinID,
                 b.bin_name AS BinName,
                 b.bin_capacity AS BinCapacity,
-                COALESCE(SUM(i.inventory_stock), 0) AS BinCurrentStock,
+                COALESCE(SUM(i.inventory_stock), 0) AS BinCurrentStock
             FROM 
                 warehouse_bin b
             LEFT JOIN 
                 inventory_location il ON il.warehouse_bin_id = b.warehouse_bin_id_pkey
             LEFT JOIN 
-                inventory i ON i.inventory_location_id = il.inventory_location_id_pkey
+                inventory i ON i.inventory_id_pkey = il.inventory_id
             WHERE   
                 b.warehouse_shelf_id = @ShelfID
             GROUP BY 
-                b.warehouse_bin_id_pkey, b.bin_name, b.bin_capacity, s.warehouse_shelf_id_pkey, s.shelf_name;";
+                b.warehouse_bin_id_pkey, b.bin_name, b.bin_capacity;";
 
                 var parameters = new { ShelfID = shelfID };
 

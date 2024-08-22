@@ -18,21 +18,33 @@ namespace Inventory_Management_Backend.Repository
         }
 
         // This method will be called from the floor repository to create a room
-        public async Task CreateRoom(int floorID, WarehouseRoomRequestDTO requestDTO)
+        public async Task CreateRoom(int floorID, WarehouseRoomRequestDTO requestDTO, IDbConnection? connection, IDbTransaction? transaction)
         {
-            using (IDbConnection connection = _db.CreateConnection())
+            bool isNewConnection = false;
+            bool isNewTransaction = false;
+            if (connection == null)
+            {
+                connection = _db.CreateConnection();
+                isNewConnection = true;
+            }
+            if (transaction == null)
             {
                 connection.Open();
+                transaction = connection.BeginTransaction();
+                isNewTransaction = true;
+            }
 
-                // Create the room on the floor and the its ID
+            try
+            {
+                // Create the room on the floor and get its ID
                 string createQuery = @"
-                    INSERT INTO warehouse_room (room_name, warehouse_floor_id_pkey)
-                    VALUES (@RoomName, @FloorID)
-                    RETURNING warehouse_room_id_pkey;";
+            INSERT INTO warehouse_room (room_name, warehouse_floor_id)
+            VALUES (@RoomName, @FloorID)
+            RETURNING warehouse_room_id_pkey;";
 
                 var parameters = new { RoomName = requestDTO.RoomName, FloorID = floorID };
 
-                var roomID = await connection.QueryFirstOrDefaultAsync<int>(createQuery, parameters);
+                var roomID = await connection.QueryFirstOrDefaultAsync<int>(createQuery, parameters, transaction);
 
                 if (roomID == 0)
                 {
@@ -45,12 +57,30 @@ namespace Inventory_Management_Backend.Repository
                     {
                         foreach (var aisle in requestDTO.Aisles)
                         {
-                            await _aisleRepository.CreateAisle(roomID, aisle);
+                            await _aisleRepository.CreateAisle(roomID, aisle, connection, transaction);
                         }
                     }
                 }
-            }
 
+            }
+            catch (Exception ex)
+            {
+                // Rollback the transaction if any error occurs
+                transaction.Rollback();
+                throw new Exception("Transaction failed and rolled back", ex);
+            }
+            finally
+            {
+                if (isNewTransaction)
+                {
+                    transaction.Commit();
+                    transaction.Dispose();
+                }
+                if (isNewConnection)
+                {
+                    connection.Close();
+                }
+            }
         }
 
         public async Task DeleteRoom(int? roomID, int? floorID)
@@ -113,9 +143,9 @@ namespace Inventory_Management_Backend.Repository
 
                 string query = @"
                        SELECT warehouse_room_id_pkey AS RoomID,
-                               room_name AS RoomName,
+                               room_name AS RoomName
                         FROM warehouse_room
-                        WHERE warehouse_floor_id_pkey = @FloorID;";
+                        WHERE warehouse_floor_id = @FloorID;";
 
                 var parameters = new { FloorID = floorID };
 

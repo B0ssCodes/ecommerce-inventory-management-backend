@@ -18,25 +18,37 @@ namespace Inventory_Management_Backend.Repository
         }
 
         // This method will be called from the aisle repository
-        public async Task CreateShelf(int aisleID, WarehouseShelfRequestDTO requestDTO)
+        public async Task CreateShelf(int aisleID, WarehouseShelfRequestDTO requestDTO, IDbConnection? connection, IDbTransaction? transaction)
         {
-            using (IDbConnection connection = _db.CreateConnection())
+            bool isNewConnection = false;
+            bool isNewTransaction = false;
+            if (connection == null)
+            {
+                connection = _db.CreateConnection();
+                isNewConnection = true;
+            }
+            if (transaction == null)
             {
                 connection.Open();
+                transaction = connection.BeginTransaction();
+                isNewTransaction = true;
+            }
 
+            try
+            {
                 // Create the shelf in the aisle and return the shelfID
                 var query = @"
-                    INSERT INTO warehouse_shelf (shelf_name, warehouse_aisle_id)
-                    VALUES (@ShelfName, @AisleID)
-                    RETURNING warehouse_shelf_id_pkey;";
+            INSERT INTO warehouse_shelf (shelf_name, warehouse_aisle_id)
+            VALUES (@ShelfName, @AisleID)
+            RETURNING warehouse_shelf_id_pkey;";
 
-                var paramters = new
+                var parameters = new
                 {
                     ShelfName = requestDTO.ShelfName,
                     AisleID = aisleID
                 };
 
-                var shelfID = await connection.QueryFirstOrDefaultAsync<int>(query, paramters);
+                var shelfID = await connection.QueryFirstOrDefaultAsync<int>(query, parameters, transaction);
 
                 if (shelfID == 0)
                 {
@@ -47,11 +59,30 @@ namespace Inventory_Management_Backend.Repository
                     // If the shelf has bins, create them
                     if (requestDTO.Bins != null && requestDTO.Bins.Count > 0)
                     {
-                        foreach(var bin in requestDTO.Bins)
+                        foreach (var bin in requestDTO.Bins)
                         {
-                            await _warehouseBinRepository.CreateBin(shelfID, bin);
+                            await _warehouseBinRepository.CreateBin(shelfID, bin, connection, transaction);
                         }
                     }
+                }
+
+            }
+            catch (Exception ex)
+            {
+                // Rollback the transaction if any error occurs
+                transaction.Rollback();
+                throw new Exception("Transaction failed and rolled back", ex);
+            }
+            finally
+            {
+                if (isNewTransaction)
+                {
+                    transaction.Commit();
+                    transaction.Dispose();
+                }
+                if (isNewConnection)
+                {
+                    connection.Close();
                 }
             }
         }
@@ -122,8 +153,7 @@ namespace Inventory_Management_Backend.Repository
                 string query = @"
                        SELECT     
                         warehouse_shelf_id_pkey AS ShelfID,
-                        warehouse_shelf_name AS ShelfName,
-                        warehouse_shelf_capacity AS ShelfCapacity
+                        shelf_name AS ShelfName
                         FROM warehouse_shelf
                         WHERE warehouse_aisle_id = @AisleID;";
 

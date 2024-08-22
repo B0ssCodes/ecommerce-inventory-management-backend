@@ -177,6 +177,10 @@ public class UserLoggingMiddleware
                     _logger.LogError("Invalid User ID: {UserIdString}", userIdString);
                 }
             }
+            else
+            {
+                userId = 1;
+            }
 
             // Get the response body
             var originalResponseBodyStream = httpContext.Response.Body;

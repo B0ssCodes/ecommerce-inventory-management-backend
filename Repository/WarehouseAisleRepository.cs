@@ -17,21 +17,33 @@ namespace Inventory_Management_Backend.Repository
         }
 
         // This method will be called from the room repository
-        public async Task CreateAisle(int roomID, WarehouseAisleRequestDTO requestDTO)
+        public async Task CreateAisle(int roomID, WarehouseAisleRequestDTO requestDTO, IDbConnection? connection, IDbTransaction? transaction)
         {
-            using (IDbConnection connection = _db.CreateConnection())
+            bool isNewConnection = false;
+            bool isNewTransaction = false;
+            if (connection == null)
+            {
+                connection = _db.CreateConnection();
+                isNewConnection = true;
+            }
+            if (transaction == null)
             {
                 connection.Open();
-                
+                transaction = connection.BeginTransaction();
+                isNewTransaction = true;
+            }
+
+            try
+            {
                 // Create the aisle in the room and return the aisleID
                 string createQuery = @"
-                        INSERT INTO warehouse_aisle (aisle_name, warehouse_room_id)
-                        VALUES (@AisleName, @RoomID)
-                        RETURNING warehouse_aisle_id_pkey;";
+            INSERT INTO warehouse_aisle (aisle_name, warehouse_room_id)
+            VALUES (@AisleName, @RoomID)
+            RETURNING warehouse_aisle_id_pkey;";
 
                 var parameters = new { AisleName = requestDTO.AisleName, RoomID = roomID };
 
-                var aisleID = await connection.QueryFirstOrDefaultAsync<int>(createQuery, parameters);
+                var aisleID = await connection.QueryFirstOrDefaultAsync<int>(createQuery, parameters, transaction);
 
                 if (aisleID == 0)
                 {
@@ -44,9 +56,27 @@ namespace Inventory_Management_Backend.Repository
                     {
                         foreach (var shelf in requestDTO.Shelves)
                         {
-                            await _shelfRepository.CreateShelf(aisleID, shelf);
+                            await _shelfRepository.CreateShelf(aisleID, shelf, connection, transaction);
                         }
                     }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Rollback the transaction if any error occurs
+                transaction.Rollback();
+                throw new Exception("Transaction failed and rolled back", ex);
+            }
+            finally
+            {
+                if (isNewTransaction)
+                {
+                    transaction.Commit();
+                    transaction.Dispose();
+                }
+                if (isNewConnection)
+                {
+                    connection.Close();
                 }
             }
         }
@@ -122,7 +152,8 @@ namespace Inventory_Management_Backend.Repository
                 connection.Open();
 
                 string query = @"
-                        SELECT warehouse_aisle_id_pkey AS AisleID, aisle_name AS AisleName
+                        SELECT warehouse_aisle_id_pkey AS AisleID,
+                                aisle_name AS AisleName
                         FROM warehouse_aisle
                         WHERE warehouse_room_id = @RoomID";
 

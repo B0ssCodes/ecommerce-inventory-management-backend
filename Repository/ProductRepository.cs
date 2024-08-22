@@ -5,6 +5,7 @@ using Inventory_Management_Backend.Models.Dto;
 using Inventory_Management_Backend.Repository.IRepository;
 using Microsoft.Extensions.Caching.Memory;
 using System.Data;
+using System.Diagnostics;
 
 namespace Inventory_Management_Backend.Repository
 {
@@ -12,12 +13,15 @@ namespace Inventory_Management_Backend.Repository
     {
         private readonly DapperContext _db;
         private readonly IConfiguration _configuration;
+        private readonly IInventoryRepository _inventoryRepository;
+        private readonly IInventoryLocationRepository _inventoryLocationRepository;
 
-        public ProductRepository(DapperContext db, IConfiguration configuration)
+        public ProductRepository(DapperContext db, IConfiguration configuration, IInventoryRepository inventoryRepository, IInventoryLocationRepository inventoryLocationRepository)
         {
             _db = db;
             _configuration = configuration;
-
+            _inventoryRepository = inventoryRepository;
+            _inventoryLocationRepository = inventoryLocationRepository;
         }
         public async Task CreateProduct(ProductRequestDTO productRequestDTO)
         {
@@ -116,6 +120,19 @@ namespace Inventory_Management_Backend.Repository
                                 ProductID = insertedProduct.ProductID,
                                 ImageUrl = relativeImageUrl
                             }, transaction);
+                        }
+
+                            await _inventoryRepository.CreateInventory(insertedProduct.ProductID);
+
+                        int inventoryID = await _inventoryRepository.InventoryExists(insertedProduct.ProductID);
+
+                        if (inventoryID == 0)
+                        {
+                            throw new Exception("Inventory does not exist");
+                        }
+                        else
+                        {
+
                         }
 
                         // Commit the transaction

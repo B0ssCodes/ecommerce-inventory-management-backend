@@ -435,14 +435,7 @@ namespace Inventory_Management_Backend.Repository
                             // If the type is Outbound, throw an exception.
                             if (inventoryID == 0)
                             {
-                                if (transactionTypeID == (int)TransactionTypeEnum.Inbound)
-                                {
-                                    await _inventoryRepository.CreateInventory(item);
-                                }
-                                else if (transactionTypeID == (int)TransactionTypeEnum.Outbound)
-                                {
-                                    throw new Exception("Inventory does not exist");
-                                }
+                                throw new Exception("Inventory does not exist");
                             }
 
                         }

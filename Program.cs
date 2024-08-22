@@ -77,6 +77,13 @@ builder.Services.AddScoped<IUserPermissionRepository, UserPermissionRepository>(
 builder.Services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
 builder.Services.AddScoped<IUserLogRepository, UserLogRepository>();
 builder.Services.AddScoped<IMaterializedViewRepository, MaterializedViewRepository>();
+builder.Services.AddScoped<IWarehouseBinRepository, WarehouseBinRepository>();
+builder.Services.AddScoped<IWarehouseShelfRepository, WarehouseShelfRepository>();
+builder.Services.AddScoped<IWarehouseAisleRepository, WarehouseAisleRepository>();
+builder.Services.AddScoped<IWarehouseRoomRepository, WarehouseRoomRepository>();
+builder.Services.AddScoped<IWarehouseFloorRepository, WarehouseFloorRepository>();
+builder.Services.AddScoped<IWarehouseRepository, WarehouseRepository>();
+builder.Services.AddScoped<IInventoryLocationRepository, InventoryLocationRepository>();
 builder.Services.AddScoped<ApiResponse>();
 builder.Services.AddMemoryCache();
 

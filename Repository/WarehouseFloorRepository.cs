@@ -18,25 +18,37 @@ namespace Inventory_Management_Backend.Repository
         }
 
         // This method will be called from the warehouse repository
-        public async Task CreateFloor(int warehouseID, WarehouseFloorRequestDTO requestDTO)
+        public async Task CreateFloor(int warehouseID, WarehouseFloorRequestDTO requestDTO, IDbConnection? connection, IDbTransaction? transaction)
         {
-            using (IDbConnection connection = _db.CreateConnection())
+            bool isNewConnection = false;
+            bool isNewTransaction = false; 
+            if (connection == null)
+            {
+                connection = _db.CreateConnection();
+                isNewConnection = true;
+            }
+            if (transaction == null)
             {
                 connection.Open();
+                transaction = connection.BeginTransaction();
+                isNewTransaction = true;
+            }
 
+            try
+            {
                 // Create a new floor in the warehouse
                 string createQuery = @"
-                    INSERT INTO warehouse_floor (floor_name, warehouse_id)
-                    VALUES (@FloorName, @WarehouseID)
-                    RETURNING warehouse_floor_id_pkey;";
+            INSERT INTO warehouse_floor (floor_name, warehouse_id)
+            VALUES (@FloorName, @WarehouseID)
+            RETURNING warehouse_floor_id_pkey;";
 
                 var parameters = new { FloorName = requestDTO.FloorName, WarehouseID = warehouseID };
 
-                var floorID = await connection.QueryFirstOrDefaultAsync<int>(createQuery, parameters);
+                var floorID = await connection.QueryFirstOrDefaultAsync<int>(createQuery, parameters, transaction);
 
                 if (floorID == 0)
                 {
-                    throw new Exception("Floor not found");
+                    throw new Exception("Failed to create floor");
                 }
                 else
                 {
@@ -45,9 +57,27 @@ namespace Inventory_Management_Backend.Repository
                     {
                         foreach (var room in requestDTO.Rooms)
                         {
-                            await _roomRepository.CreateRoom(floorID, room);
+                            await _roomRepository.CreateRoom(floorID, room, connection, transaction);
                         }
                     }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Rollback the transaction if any error occurs
+                transaction.Rollback();
+                throw new Exception("Transaction failed and rolled back", ex);
+            }
+            finally
+            {
+                if (isNewTransaction)
+                {
+                    transaction.Commit();
+                    transaction.Dispose();
+                }
+                if (isNewConnection)
+                {
+                    connection.Close();
                 }
             }
         }

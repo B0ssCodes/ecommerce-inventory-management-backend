@@ -5,7 +5,7 @@ namespace Inventory_Management_Backend.Repository.IRepository
 {
     public interface IWarehouseRepository
     {
-        public Task<List<AllWarehouseResponseDTO>> GetWarehouses(PaginationParams paginationParams);
+        public Task<(List<AllWarehouseResponseDTO>, int)> GetWarehouses(PaginationParams paginationParams);
         public Task<WarehouseResponseDTO> GetWarehouse(int warehouseID);
         public Task CreateWarehouse(WarehouseRequestDTO requestDTO);
         public Task UpdateWarehouse(int warehouseID, WarehouseRequestDTO requestDTO);

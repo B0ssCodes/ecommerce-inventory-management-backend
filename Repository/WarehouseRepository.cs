@@ -23,28 +23,42 @@ namespace Inventory_Management_Backend.Repository
             using (IDbConnection connection = _db.CreateConnection())
             {
                 connection.Open();
-                
-                // Insert the warehouse's name and address first then return the new warehouse's ID
-                string createQuery = @"
+                using (IDbTransaction transaction = connection.BeginTransaction())
+                {
+                    try
+                    {
+                        // Insert the warehouse's name and address first then return the new warehouse's ID
+                        string createQuery = @"
                     INSERT INTO warehouse (warehouse_name, warehouse_address)
                     VALUES (@WarehouseName, @WarehouseAddress)
                     RETURNING warehouse_id_pkey;";
 
-                var parameters = new { WarehouseName = requestDTO.WarehouseName, WarehouseAddress = requestDTO.WarehouseAddress };
+                        var parameters = new { WarehouseName = requestDTO.WarehouseName, WarehouseAddress = requestDTO.WarehouseAddress };
 
-                int warehouseID = await connection.QueryFirstOrDefaultAsync<int>(createQuery, parameters);
+                        int warehouseID = await connection.QueryFirstOrDefaultAsync<int>(createQuery, parameters, transaction);
 
-                if (warehouseID == 0)
-                {
-                    throw new Exception("Failed to create warehouse");
-                }
+                        if (warehouseID == 0)
+                        {
+                            throw new Exception("Failed to create warehouse");
+                        }
 
-                // If the warehouse has floors, create them
-                if (requestDTO.Floors != null && requestDTO.Floors.Count > 0)
-                {
-                    foreach (var floor in requestDTO.Floors)
+                        // If the warehouse has floors, create them
+                        if (requestDTO.Floors != null && requestDTO.Floors.Count > 0)
+                        {
+                            foreach (var floor in requestDTO.Floors)
+                            {
+                                await _floorRepository.CreateFloor(warehouseID, floor, connection, transaction);
+                            }
+                        }
+
+                        // Commit the transaction if everything is successful
+                        transaction.Commit();
+                    }
+                    catch (Exception ex)
                     {
-                        await _floorRepository.CreateFloor(warehouseID, floor);
+                        // Rollback the transaction if any error occurs
+                        transaction.Rollback();
+                        throw new Exception("Transaction failed and rolled back", ex);
                     }
                 }
             }
@@ -76,7 +90,8 @@ namespace Inventory_Management_Backend.Repository
 
                 string getQuery = @"
                     SELECT warehouse_id_pkey as WarehouseID, 
-                           warehouse_name as Name
+                           warehouse_name as WarehouseName,
+                           warehouse_address as WarehouseAddress   
                     FROM warehouse
                     WHERE warehouse_id_pkey = @WarehouseID";
 
@@ -97,29 +112,41 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task<List<AllWarehouseResponseDTO>> GetWarehouses(PaginationParams paginationParams)
+        public async Task<(List<AllWarehouseResponseDTO>, int)> GetWarehouses(PaginationParams paginationParams)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
                 connection.Open();
 
                 string getQuery = @"
-                    SELECT warehouse_id_pkey as WarehouseID, 
-                           warehouse_name as WarehouseName,
-                           warehouse_address as WarehouseAddress
-                    FROM warehouse
-                    WHERE deleted = false
-                    ORDER BY warehouse_id_pkey
-                    OFFSET @Offset ROWS
-                    FETCH NEXT @Limit ROWS ONLY";
+            SELECT w.warehouse_id_pkey as WarehouseID, 
+                   w.warehouse_name as WarehouseName,
+                   w.warehouse_address as WarehouseAddress,
+                   COUNT(f.warehouse_floor_id_pkey) as FloorCount,
+                   COUNT(*) OVER() AS TotalCount
+            FROM warehouse w
+            LEFT JOIN warehouse_floor f ON w.warehouse_id_pkey = f.warehouse_id
+            WHERE w.deleted = false
+            GROUP BY w.warehouse_id_pkey, w.warehouse_name, w.warehouse_address
+            ORDER BY w.warehouse_id_pkey
+            OFFSET @Offset ROWS
+            FETCH NEXT @Limit ROWS ONLY";
 
                 int offset = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
 
                 var parameters = new { Offset = offset, Limit = paginationParams.PageSize };
 
-                var warehouses = await connection.QueryAsync<AllWarehouseResponseDTO>(getQuery, parameters);
+                var result = await connection.QueryAsync<AllWarehouseResponseDTO, long, (AllWarehouseResponseDTO, long)>(
+                    getQuery,
+                    (warehouse, totalCount) => (warehouse, totalCount),
+                    parameters,
+                    splitOn: "TotalCount"
+                );
 
-                return warehouses.AsList();
+                var warehouses = result.Select(r => r.Item1).ToList();
+                int totalCount = (int)result.FirstOrDefault().Item2;
+
+                return (warehouses, totalCount);
             }
         }
 
