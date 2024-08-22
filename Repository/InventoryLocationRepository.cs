@@ -17,13 +17,13 @@ namespace Inventory_Management_Backend.Repository
             _inventoryRepository = inventoryRepository;
         }
 
-        public async Task CreateInventoryLocation(int? binID, int productID)
+        public async Task CreateInventoryLocation(InventoryLocationRequestDTO requestDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
                 connection.Open();
 
-                int inventoryID = await _inventoryRepository.InventoryExists(productID);
+                int inventoryID = await _inventoryRepository.InventoryExists(requestDTO.ProductID);
 
                 if (inventoryID == 0)
                 {
@@ -34,15 +34,14 @@ namespace Inventory_Management_Backend.Repository
                         INSERT INTO inventory_location(warehouse_bin_id, inventory_id)
                         VALUES (@BinID, @InventoryID);";
 
-                if (binID == null)
+                if (requestDTO.BinID == null)
                 {
-                    var nullParameters = new { BinID = binID, InventoryID = inventoryID };
+                    var nullParameters = new { BinID = (int?)null, InventoryID = inventoryID };
                     await connection.ExecuteAsync(createQuery, nullParameters);
-
                 }
                 else
                 {
-                    var parameters = new { BinID = binID, InventoryID = inventoryID };
+                    var parameters = new { BinID = requestDTO.BinID, InventoryID = inventoryID };
                     await connection.ExecuteAsync(createQuery, parameters);
                 }
 
@@ -97,20 +96,18 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task UpdateInventoryLocation(int binID, int locationID)
+        public async Task UpdateInventoryLocation(int locationID, InventoryLocationUpdateDTO updateDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
                 connection.Open();
 
-                
-
                 string updateQuery = @"
                         UPDATE inventory_location
                         SET warehouse_bin_id = @BinID
-                        WHERE warehouse_location_id_pkey = @LocationID;";
+                        WHERE inventory_location_id_pkey = @LocationID;";
 
-                var parameters = new { BinID = binID, LocationID = locationID };
+                var parameters = new { BinID = updateDTO.BinID, LocationID = locationID};
 
                 await connection.ExecuteAsync(updateQuery, parameters);
             }

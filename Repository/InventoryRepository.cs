@@ -162,6 +162,7 @@ namespace Inventory_Management_Backend.Repository
             SELECT i.inventory_id_pkey AS InventoryID,
                    i.inventory_stock AS Quantity,
                    i.inventory_cost AS Price,
+                   p.product_id_pkey AS ProductID,
                    p.product_name AS ProductName,
                    p.sku AS ProductSKU,
                    p.product_cost_price AS ProductPrice,
@@ -190,7 +191,7 @@ namespace Inventory_Management_Backend.Repository
                 }
 
                 baseQuery += @")
-        SELECT InventoryID, Quantity, Price, ProductName, ProductSKU, ProductPrice, TotalCount
+        SELECT InventoryID, Quantity, Price, ProductID, ProductName, ProductSKU, ProductPrice, TotalCount
         FROM InventoryCTE";
 
                 if (paginationParams.SortBy != null)

@@ -130,7 +130,6 @@ namespace Inventory_Management_Backend.Repository
                        SELECT     
                         warehouse_shelf_id_pkey AS ShelfID,
                         warehouse_shelf_name AS ShelfName,
-                        warehouse_shelf_capacity AS ShelfCapacity
                         FROM warehouse_shelf
                         WHERE warehouse_shelf_id_pkey = @ShelfID;";
 
