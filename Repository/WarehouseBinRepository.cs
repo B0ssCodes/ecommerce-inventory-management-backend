@@ -79,46 +79,56 @@ namespace Inventory_Management_Backend.Repository
                         SELECT COUNT(*) AS ItemCount
                         FROM inventory i 
                         JOIN inventory_location il 
-                        ON i.inventory_location_id= il.inventory_location_id_pkey
+                        ON i.inventory_id_pkey = il.inventory_id
+                        JOIN warehouse_bin b
+                        ON il.warehouse_bin_id = b.warehouse_bin_id_pkey
                         WHERE i.inventory_stock > 0";
 
                 if (binID != null)
                 {
-                    checkIfBinHasProduct += " WHERE il.warehouse_bin_id = @BinID";
+                    checkIfBinHasProduct += " AND il.warehouse_bin_id = @BinID";
                 }
                 else if (shelfID != null)
                 {
-                    checkIfBinHasProduct += " WHERE il.warehouse_shelf_id = @ShelfID";
+                    checkIfBinHasProduct += " AND b.warehouse_shelf_id = @ShelfID";
                 }
                 else
                 {
                     throw new Exception("Invalid Parameters");
                 }
 
-                var checkParameters = new { BinID = binID };
+                var checkParameters = new { BinID = binID, ShelfID = shelfID };
 
-                int result = await connection.QueryFirstOrDefaultAsync<int>(checkIfBinHasProduct, checkParameters);
-                if (result > 0)
+                try
                 {
-                    throw new Exception("One or More bins still contains items, remove all items to delete it");
-                }
+                    int result = await connection.QueryFirstOrDefaultAsync<int>(checkIfBinHasProduct, checkParameters);
+                    if (result > 0)
+                    {
+                        throw new Exception("One or More bins still contains items, remove all items to delete it");
+                    }
 
-                string query = @"
+                    string query = @"
                        UPDATE warehouse_bin
                        SET deleted = false";
 
-                if (binID != null)
-                {
-                    query+= " WHERE warehouse_bin_id_pkey = @BinID";
-                }
-                else if (shelfID != null)
-                {
-                    query += " WHERE warehouse_shelf_id = @ShelfID";
-                }
+                    if (binID != null)
+                    {
+                        query += " WHERE warehouse_bin_id_pkey = @BinID";
+                    }
+                    else if (shelfID != null)
+                    {
+                        query += " WHERE warehouse_shelf_id = @ShelfID";
+                    }
 
-                var parameters = new { BinID = binID };
+                    var parameters = new { BinID = binID, ShelfID = shelfID};
 
-                await connection.ExecuteAsync(query, parameters);
+                    await connection.ExecuteAsync(query, parameters);
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception(ex.Message);
+                }
+                
             }
         }
 

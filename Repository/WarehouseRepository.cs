@@ -156,15 +156,15 @@ namespace Inventory_Management_Backend.Repository
             {
                 connection.Open();
 
-                string updateQuery = @"
+                    string updateQuery = @"
                     UPDATE warehouse
                     SET warehouse_name = @WarehouseName,
                         warehouse_address = @WarehouseAddress
                     WHERE warehouse_id_pkey = @WarehouseID";
 
-                var parameters = new { WarehouseName = requestDTO.WarehouseName, WarehouseAddress = requestDTO.WarehouseAddress, WarehouseID = warehouseID };
+                    var parameters = new { WarehouseName = requestDTO.WarehouseName, WarehouseAddress = requestDTO.WarehouseAddress, WarehouseID = warehouseID };
 
-                await connection.ExecuteAsync(updateQuery, parameters);
+                await connection.ExecuteAsync(updateQuery, parameters);     
             }
         }
     }

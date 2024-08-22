@@ -83,39 +83,62 @@ namespace Inventory_Management_Backend.Repository
 
         public async Task DeleteAisle(int? aisleID, int? roomID)
         {
-            try
+            using (IDbConnection connection = _db.CreateConnection())
             {
-                using (IDbConnection connection = _db.CreateConnection())
-                { 
-                    await _shelfRepository.DeleteShelf(null, aisleID);
-
+                try
+                {
                     connection.Open();
-
-                    string deleteQuery = @"
-                        UPDATE warehouse_aisle
-                        SET deleted = true";
-
-                    if (roomID != null)
+                    using (var transaction = connection.BeginTransaction())
                     {
-                        deleteQuery += " WHERE warehouse_room_id = @RoomID";
-                    }
-                    else if (aisleID != null)
-                    {
-                        deleteQuery += " WHERE warehouse_aisle_id_pkey = @AisleID";
-                    }
-                    else
-                    {
-                        throw new Exception("Invalid Parameters");
-                    }
+                        if (roomID.HasValue)
+                        {
+                            // Fetch aisle IDs associated with the room
+                            string fetchAislesQuery = @"
+                        SELECT warehouse_aisle_id_pkey
+                        FROM warehouse_aisle
+                        WHERE warehouse_room_id = @RoomID AND deleted = false;";
 
-                    var parameters = new { RoomID = roomID, AisleID = aisleID };
+                            var aisleIDs = await connection.QueryAsync<int>(fetchAislesQuery, new { RoomID = roomID }, transaction);
 
-                    await connection.ExecuteAsync(deleteQuery, parameters);
+                            foreach (var id in aisleIDs)
+                            {
+                                await _shelfRepository.DeleteShelf(null, id);
+                            }
+                        }
+                        else if (aisleID.HasValue)
+                        {
+                            await _shelfRepository.DeleteShelf(null, aisleID);
+                        }
+                        else
+                        {
+                            throw new Exception("Invalid parameters");
+                        }
+
+                        // Build the dynamic delete query
+                        string deleteQuery = @"
+                    UPDATE warehouse_aisle
+                    SET deleted = true";
+
+                        if (aisleID.HasValue)
+                        {
+                            deleteQuery += " WHERE warehouse_aisle_id_pkey = @AisleID";
+                        }
+                        else if (roomID.HasValue)
+                        {
+                            deleteQuery += " WHERE warehouse_room_id = @RoomID";
+                        }
+
+                        var parameters = new { AisleID = aisleID, RoomID = roomID };
+
+                        await connection.ExecuteAsync(deleteQuery, parameters, transaction);
+
+                        transaction.Commit();
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                throw new Exception ("Failed to delete aisle", ex) ;
+                catch (Exception ex)
+                {
+                    throw new Exception("Failed to delete aisle", ex);
+                }
             }
         }
 
@@ -128,7 +151,7 @@ namespace Inventory_Management_Backend.Repository
                 string query = @"
                         SELECT warehouse_aisle_id_pkey AS AisleID, aisle_name AS AisleName
                         FROM warehouse_aisle
-                        WHERE warehouse_aisle_id_pkey = @AisleID";
+                        WHERE warehouse_aisle_id_pkey = @AisleID AND deleted = false;";
 
                 var parameters = new { AisleID = aisleID };
 
@@ -155,7 +178,7 @@ namespace Inventory_Management_Backend.Repository
                         SELECT warehouse_aisle_id_pkey AS AisleID,
                                 aisle_name AS AisleName
                         FROM warehouse_aisle
-                        WHERE warehouse_room_id = @RoomID";
+                        WHERE warehouse_room_id = @RoomID AND deleted = false;";
 
                 var parameters = new { RoomID = roomID };
 

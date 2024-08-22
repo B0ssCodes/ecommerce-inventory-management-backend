@@ -88,24 +88,59 @@ namespace Inventory_Management_Backend.Repository
             {
                 using (IDbConnection connection = _db.CreateConnection())
                 {
-                    await _roomRepository.DeleteRoom(null, floorID);
                     connection.Open();
+                    using (var transaction = connection.BeginTransaction())
+                    {
+                        if (warehouseID.HasValue)
+                        {
+                            // Fetch floor IDs associated with the warehouse
+                            string fetchFloorsQuery = @"
+                        SELECT warehouse_floor_id_pkey
+                        FROM warehouse_floor
+                        WHERE warehouse_id = @WarehouseID AND deleted = false;";
 
-                    string deleteQuery = @"
-                        UPDATE warehouse_floor
-                        SET deleted = true
-                        WHERE warehouse_floor_id_pkey = @FloorID;";
+                            var floorIDs = await connection.QueryAsync<int>(fetchFloorsQuery, new { WarehouseID = warehouseID }, transaction);
 
-                    var parameters = new { FloorID = floorID };
+                            foreach (var id in floorIDs)
+                            {
+                                await _roomRepository.DeleteRoom(null, id);
+                            }
+                        }
+                        else if (floorID.HasValue)
+                        {
+                            await _roomRepository.DeleteRoom(null, floorID);
+                        }
+                        else
+                        {
+                            throw new Exception("Invalid parameters");
+                        }
 
-                    await connection.ExecuteAsync(deleteQuery, parameters);
+                        // Build the dynamic delete query
+                        string deleteQuery = @"
+                    UPDATE warehouse_floor
+                    SET deleted = true";
+
+                        if (floorID.HasValue)
+                        {
+                            deleteQuery += " WHERE warehouse_floor_id_pkey = @FloorID";
+                        }
+                        else if (warehouseID.HasValue)
+                        {
+                            deleteQuery += " WHERE warehouse_id = @WarehouseID";
+                        }
+
+                        var parameters = new { FloorID = floorID, WarehouseID = warehouseID };
+
+                        await connection.ExecuteAsync(deleteQuery, parameters, transaction);
+
+                        transaction.Commit();
+                    }
                 }
             }
             catch (Exception ex)
             {
-                throw new Exception("Failed to delete floor", ex);  
+                throw new Exception("Failed to delete floor", ex);
             }
-            
         }
 
         public async Task<WarehouseFloorResponseDTO> GetFloor(int floorID)
@@ -118,7 +153,7 @@ namespace Inventory_Management_Backend.Repository
                     SELECT warehouse_floor_id_pkey AS FloorID, 
                            floor_name AS FloorName
                     FROM warehouse_floor
-                    WHERE warehouse_floor_id_pkey = @FloorID;";
+                    WHERE warehouse_floor_id_pkey = @FloorID AND deleted = false;";
 
                 var parameters = new { FloorID = floorID };
 
@@ -147,7 +182,7 @@ namespace Inventory_Management_Backend.Repository
                     SELECT warehouse_floor_id_pkey AS FloorID, 
                            floor_name AS FloorName
                     FROM warehouse_floor
-                    WHERE warehouse_id = @WarehouseID;";
+                    WHERE warehouse_id = @WarehouseID AND deleted = false;";
 
                 var parameters = new { WarehouseID = warehouseID };
 

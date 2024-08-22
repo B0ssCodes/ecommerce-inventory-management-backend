@@ -2,6 +2,7 @@
 {
     public class WarehouseBinRequestDTO
     {
+        public int? BinID { get; set; }
         public string BinName { get; set; }
         public int? BinCapacity { get; set; }
     }
