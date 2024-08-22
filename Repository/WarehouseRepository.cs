@@ -68,17 +68,28 @@ namespace Inventory_Management_Backend.Repository
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
-                await _floorRepository.DeleteFloor(null, warehouseID);
                 connection.Open();
+                using (IDbTransaction transaction = connection.BeginTransaction())
+                {
+                    try
+                    {
+                        await _floorRepository.DeleteFloor(null, warehouseID, connection, transaction);
 
-                string deleteQuery = @"
-                    UPDATE warehouse
-                    set deleted = true
-                    WHERE warehouse_id_pkey = @WarehouseID";
+                        string deleteQuery = @"
+                                UPDATE warehouse
+                                set deleted = true
+                                WHERE warehouse_id_pkey = @WarehouseID";
 
-                var parameters = new { WarehouseID = warehouseID };
+                        var parameters = new { WarehouseID = warehouseID };
 
-                await connection.ExecuteAsync(deleteQuery, parameters);
+                        await connection.ExecuteAsync(deleteQuery, parameters);
+                    }
+                    catch (Exception ex)
+                    {
+                        transaction.Rollback();
+                        throw new Exception("Failed to delete transaction");
+                    }
+                }
             }
         }
 
@@ -156,15 +167,35 @@ namespace Inventory_Management_Backend.Repository
             {
                 connection.Open();
 
-                    string updateQuery = @"
-                    UPDATE warehouse
-                    SET warehouse_name = @WarehouseName,
-                        warehouse_address = @WarehouseAddress
-                    WHERE warehouse_id_pkey = @WarehouseID";
+                using (IDbTransaction transaction = connection.BeginTransaction())
+                {
+                    try
+                    {
+                        string updateQuery = @"
+                            UPDATE warehouse
+                            SET warehouse_name = @WarehouseName,
+                                warehouse_address = @WarehouseAddress
+                            WHERE warehouse_id_pkey = @WarehouseID";
 
-                    var parameters = new { WarehouseName = requestDTO.WarehouseName, WarehouseAddress = requestDTO.WarehouseAddress, WarehouseID = warehouseID };
+                        var parameters = new { WarehouseName = requestDTO.WarehouseName, WarehouseAddress = requestDTO.WarehouseAddress, WarehouseID = warehouseID };
 
-                await connection.ExecuteAsync(updateQuery, parameters);     
+                        await connection.ExecuteAsync(updateQuery, parameters);
+
+                        if (requestDTO.Floors != null && requestDTO.Floors.Count > 0)
+                        {
+                            await _floorRepository.CreateOrUpdateFloors(warehouseID, requestDTO.Floors, connection, transaction);
+                        }
+                        // If everything is successful, commit the transaction
+                        transaction.Commit();
+                    }
+                    catch (Exception ex)
+                    {
+                        transaction.Rollback();
+                        throw new Exception("Transaction failed and rolled back", ex);
+                    }
+
+                }
+
             }
         }
     }

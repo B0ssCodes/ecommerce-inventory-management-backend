@@ -69,13 +69,23 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task DeleteBin(int? binID, int? shelfID)
+        public async Task DeleteBin(int? binID, int? shelfID, IDbConnection? connection, IDbTransaction? transaction)
         {
-            using (IDbConnection connection = _db.CreateConnection())
+            bool isNewConnection = false;
+            bool isNewTransaction = false;
+            if (connection == null)
+            {
+                connection = _db.CreateConnection();
+                isNewConnection = true;
+            }
+            if (transaction == null)
             {
                 connection.Open();
+                transaction = connection.BeginTransaction();
+                isNewTransaction = true;
+            }
 
-                string checkIfBinHasProduct = @"
+            string checkIfBinHasProduct = @"
                         SELECT COUNT(*) AS ItemCount
                         FROM inventory i 
                         JOIN inventory_location il 
@@ -101,7 +111,7 @@ namespace Inventory_Management_Backend.Repository
 
                 try
                 {
-                    int result = await connection.QueryFirstOrDefaultAsync<int>(checkIfBinHasProduct, checkParameters);
+                    int result = await connection.QueryFirstOrDefaultAsync<int>(checkIfBinHasProduct, checkParameters, transaction);
                     if (result > 0)
                     {
                         throw new Exception("One or More bins still contains items, remove all items to delete it");
@@ -122,13 +132,23 @@ namespace Inventory_Management_Backend.Repository
 
                     var parameters = new { BinID = binID, ShelfID = shelfID};
 
-                    await connection.ExecuteAsync(query, parameters);
+                    await connection.ExecuteAsync(query, parameters, transaction);
                 }
                 catch (Exception ex)
                 {
                     throw new Exception(ex.Message);
                 }
-                
+            finally
+            {
+                if (isNewTransaction)
+                {
+                    transaction.Commit();
+                    transaction.Dispose();
+                }
+                if (isNewConnection)
+                {
+                    connection.Close();
+                }
             }
         }
 
@@ -204,12 +224,25 @@ namespace Inventory_Management_Backend.Repository
             throw new NotImplementedException();
         }
 
-        public async Task UpdateBin(int binID, int shelfID, WarehouseBinRequestDTO requestDTO)
+        public async Task UpdateBin(int shelfID, WarehouseBinRequestDTO requestDTO, IDbConnection? connection, IDbTransaction? transaction)
         {
-            using (IDbConnection connection = _db.CreateConnection())
-            {
-                connection.Open();
+            bool isNewConnection = false;
+            bool isNewTransaction = false;
 
+            if (connection == null)
+            {
+                connection = _db.CreateConnection();
+                connection.Open();
+                isNewConnection = true;
+            }
+            if (transaction == null)
+            {
+                transaction = connection.BeginTransaction();
+                isNewTransaction = true;
+            }
+
+            try
+            {
                 string query = @"
             UPDATE warehouse_bin
             SET 
@@ -221,13 +254,30 @@ namespace Inventory_Management_Backend.Repository
 
                 var parameters = new
                 {
-                    BinID = binID,
+                    BinID = requestDTO.BinID,
                     BinName = requestDTO.BinName,
                     BinCapacity = requestDTO.BinCapacity,
                     ShelfID = shelfID
                 };
 
-                await connection.ExecuteAsync(query, parameters);
+                await connection.ExecuteAsync(query, parameters, transaction);
+            }
+                catch (Exception ex)
+            {
+                transaction.Rollback();
+                throw new Exception("Transaction failed and rolled back", ex);
+            }
+            finally
+            {
+                if (isNewTransaction)
+                {
+                    transaction.Commit();
+                    transaction.Dispose();
+                }
+                if (isNewConnection)
+                {
+                    connection.Close();
+                }
             }
         }
     }

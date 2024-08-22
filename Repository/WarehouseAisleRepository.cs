@@ -81,63 +81,81 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task DeleteAisle(int? aisleID, int? roomID)
+        public async Task DeleteAisle(int? aisleID, int? roomID, IDbConnection? connection, IDbTransaction? transaction)
         {
-            using (IDbConnection connection = _db.CreateConnection())
+            bool isNewConnection = false;
+            bool isNewTransaction = false;
+
+            if (connection == null)
             {
-                try
+                connection = _db.CreateConnection();
+                connection.Open();
+                isNewConnection = true;
+            }
+            if (transaction == null)
+            {
+                transaction = connection.BeginTransaction();
+                isNewTransaction = true;
+            }
+            try
+            {
+                if (roomID.HasValue)
                 {
-                    connection.Open();
-                    using (var transaction = connection.BeginTransaction())
-                    {
-                        if (roomID.HasValue)
-                        {
-                            // Fetch aisle IDs associated with the room
-                            string fetchAislesQuery = @"
+                    // Fetch aisle IDs associated with the room
+                    string fetchAislesQuery = @"
                         SELECT warehouse_aisle_id_pkey
                         FROM warehouse_aisle
                         WHERE warehouse_room_id = @RoomID AND deleted = false;";
 
-                            var aisleIDs = await connection.QueryAsync<int>(fetchAislesQuery, new { RoomID = roomID }, transaction);
+                    var aisleIDs = await connection.QueryAsync<int>(fetchAislesQuery, new { RoomID = roomID }, transaction);
 
-                            foreach (var id in aisleIDs)
-                            {
-                                await _shelfRepository.DeleteShelf(null, id);
-                            }
-                        }
-                        else if (aisleID.HasValue)
-                        {
-                            await _shelfRepository.DeleteShelf(null, aisleID);
-                        }
-                        else
-                        {
-                            throw new Exception("Invalid parameters");
-                        }
-
-                        // Build the dynamic delete query
-                        string deleteQuery = @"
-                    UPDATE warehouse_aisle
-                    SET deleted = true";
-
-                        if (aisleID.HasValue)
-                        {
-                            deleteQuery += " WHERE warehouse_aisle_id_pkey = @AisleID";
-                        }
-                        else if (roomID.HasValue)
-                        {
-                            deleteQuery += " WHERE warehouse_room_id = @RoomID";
-                        }
-
-                        var parameters = new { AisleID = aisleID, RoomID = roomID };
-
-                        await connection.ExecuteAsync(deleteQuery, parameters, transaction);
-
-                        transaction.Commit();
+                    foreach (var id in aisleIDs)
+                    {
+                        await _shelfRepository.DeleteShelf(null, id, connection, transaction);
                     }
                 }
-                catch (Exception ex)
+                else if (aisleID.HasValue)
                 {
-                    throw new Exception("Failed to delete aisle", ex);
+                    await _shelfRepository.DeleteShelf(null, aisleID, connection, transaction);
+                }
+                else
+                {
+                    throw new Exception("Invalid parameters");
+                }
+
+                // Build the dynamic delete query
+                string deleteQuery = @"
+                            UPDATE warehouse_aisle
+                            SET deleted = true";
+
+                if (aisleID.HasValue)
+                {
+                    deleteQuery += " WHERE warehouse_aisle_id_pkey = @AisleID";
+                }
+                else if (roomID.HasValue)
+                {
+                    deleteQuery += " WHERE warehouse_room_id = @RoomID";
+                }
+
+                var parameters = new { AisleID = aisleID, RoomID = roomID };
+
+                await connection.ExecuteAsync(deleteQuery, parameters, transaction);
+            }
+            catch (Exception ex)
+            {
+                transaction.Rollback();
+                throw new Exception("Failed to delete aisle", ex);
+            }
+            finally
+            {
+                if (isNewTransaction)
+                {
+                    transaction.Commit();
+                    transaction.Dispose();
+                }
+                if (isNewConnection)
+                {
+                    connection.Close();
                 }
             }
         }
@@ -197,20 +215,50 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task UpdateAisle(int aisleID, WarehouseAisleRequestDTO requestDTO)
+        public async Task UpdateAisle(WarehouseAisleRequestDTO requestDTO, IDbConnection? connection, IDbTransaction? transaction)
         {
-            using (IDbConnection connection = _db.CreateConnection())
-            {
-                connection.Open();
+            bool isNewConnection = false;
+            bool isNewTransaction = false;
 
+            if (connection == null)
+            {
+                connection = _db.CreateConnection();
+                isNewConnection = true;
+            }
+            if (transaction == null)
+            {
+                transaction = connection.BeginTransaction();
+                isNewTransaction = true;
+            }
+            try
+            {
                 string query = @"
                         UPDATE warehouse_aisle
                         SET aisle_name = @AisleName
                         WHERE warehouse_aisle_id_pkey = @AisleID;";
 
-                var parameters = new { AisleName = requestDTO.AisleName, AisleID = aisleID };
+                var parameters = new { AisleName = requestDTO.AisleName, AisleID = requestDTO.AisleID };
 
-                await connection.ExecuteAsync(query, parameters);
+                await connection.ExecuteAsync(query, parameters, transaction);
+            }
+            catch (Exception ex)
+            {
+                // Rollback the transaction if any error occurs
+                transaction.Rollback();
+                throw new Exception("Transaction failed and rolled back", ex);
+            }
+            finally
+            {
+                if (isNewTransaction)
+                {
+                    transaction.Commit();
+                    transaction.Dispose();
+                }
+                if (isNewConnection)
+                {
+                    connection.Close();
+                }
+
             }
         }
     }

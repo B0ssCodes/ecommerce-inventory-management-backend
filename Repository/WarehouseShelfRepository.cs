@@ -87,63 +87,84 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task DeleteShelf(int? shelfID, int? aisleID)
+        public async Task DeleteShelf(int? shelfID, int? aisleID, IDbConnection? connection, IDbTransaction? transaction)
         {
-            using (IDbConnection connection = _db.CreateConnection())
+            bool isNewConnection = false;
+            bool isNewTransaction = false;
+
+            if (connection == null)
             {
-                try
+                connection = _db.CreateConnection();
+                connection.Open();
+                isNewConnection = true;
+            }
+
+            if (transaction == null)
+            {
+                transaction = connection.BeginTransaction();
+                isNewTransaction = true;
+            }
+            try
+            {
+
+                if (aisleID.HasValue)
                 {
-                    connection.Open();
-                    using (var transaction = connection.BeginTransaction())
-                    {
-                        if (aisleID.HasValue)
-                        {
-                            // Fetch shelf IDs associated with the aisle
-                            string fetchShelvesQuery = @"
+                    // Fetch shelf IDs associated with the aisle
+                    string fetchShelvesQuery = @"
                         SELECT warehouse_shelf_id_pkey
                         FROM warehouse_shelf
                         WHERE warehouse_aisle_id = @AisleID AND deleted = false;";
 
-                            var shelfIDs = await connection.QueryAsync<int>(fetchShelvesQuery, new { AisleID = aisleID }, transaction);
+                    var shelfIDs = await connection.QueryAsync<int>(fetchShelvesQuery, new { AisleID = aisleID }, transaction);
 
-                            foreach (var id in shelfIDs)
-                            {
-                                await _warehouseBinRepository.DeleteBin(null, id);
-                            }
-                        }
-                        else if (shelfID.HasValue)
-                        {
-                            await _warehouseBinRepository.DeleteBin(null, shelfID);
-                        }
-                        else
-                        {
-                            throw new Exception("ShelfID or AisleID must be provided");
-                        }
+                    foreach (var id in shelfIDs)
+                    {
+                        await _warehouseBinRepository.DeleteBin(null, id, connection, transaction);
+                    }
+                }
+                else if (shelfID.HasValue)
+                {
+                    await _warehouseBinRepository.DeleteBin(null, shelfID, connection, transaction);
+                }
+                else
+                {
+                    throw new Exception("ShelfID or AisleID must be provided");
+                }
 
-                        // Build the dynamic delete query
-                        string deleteQuery = @"
+                // Build the dynamic delete query
+                string deleteQuery = @"
                     UPDATE warehouse_shelf
                     SET deleted = true";
 
-                        if (shelfID.HasValue)
-                        {
-                            deleteQuery += " WHERE warehouse_shelf_id_pkey = @ShelfID";
-                        }
-                        else if (aisleID.HasValue)
-                        {
-                            deleteQuery += " WHERE warehouse_aisle_id = @AisleID";
-                        }
-
-                        var parameters = new { ShelfID = shelfID, AisleID = aisleID };
-
-                        await connection.ExecuteAsync(deleteQuery, parameters, transaction);
-
-                        transaction.Commit();
-                    }
-                }
-                catch (Exception ex)
+                if (shelfID.HasValue)
                 {
-                    throw new Exception("Failed to delete shelf", ex);
+                    deleteQuery += " WHERE warehouse_shelf_id_pkey = @ShelfID";
+                }
+                else if (aisleID.HasValue)
+                {
+                    deleteQuery += " WHERE warehouse_aisle_id = @AisleID";
+                }
+
+                var parameters = new { ShelfID = shelfID, AisleID = aisleID };
+
+                await connection.ExecuteAsync(deleteQuery, parameters, transaction);
+
+            }
+            catch (Exception ex)
+            {
+                transaction.Rollback();
+                throw new Exception("Failed to delete shelf", ex);
+            }
+            finally
+            {
+                if (isNewTransaction)
+                {
+                    transaction.Commit();
+                    transaction.Dispose();
+                }
+                if (isNewConnection)
+                {
+                    connection.Close();
                 }
             }
         }
@@ -199,12 +220,25 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task UpdateShelf(int shelfID, int aisleID, WarehouseShelfRequestDTO requestDTO)
+        public async Task UpdateShelf(int aisleID, WarehouseShelfRequestDTO requestDTO, IDbConnection? connection, IDbTransaction? transaction)
         {
-            using (IDbConnection connection = _db.CreateConnection())
-            {
-                connection.Open();
 
+            bool isNewConnection = false;
+            bool isNewTransaction = false;
+
+            if (connection == null)
+            {
+                connection = _db.CreateConnection();
+                connection.Open();
+                isNewConnection = true;
+            }
+            if (transaction == null)
+            {
+                transaction = connection.BeginTransaction();
+                isNewTransaction = true;
+            }
+            try
+            {
                 string query = @"
                         UPDATE warehouse_shelf
                         SET shelf_name = @ShelfName,
@@ -215,10 +249,29 @@ namespace Inventory_Management_Backend.Repository
                 {
                     ShelfName = requestDTO.ShelfName,
                     AisleID = aisleID,
-                    ShelfID = shelfID
+                    ShelfID = requestDTO.ShelfID
                 };
 
-                await connection.ExecuteAsync(query, parameters);
+                await connection.ExecuteAsync(query, parameters, transaction);
+            }
+            catch (Exception ex)
+            {
+                transaction.Rollback();
+                throw new Exception("Transaction failed and rolled back", ex);
+            }
+            finally
+            {
+                if (isNewTransaction)
+                {
+                    transaction.Commit();
+                    transaction.Dispose();
+                }
+                if (isNewConnection)
+                {
+                    connection.Close();
+                }
+
+
             }
         }
     }

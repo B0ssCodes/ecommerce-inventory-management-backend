@@ -21,7 +21,7 @@ namespace Inventory_Management_Backend.Repository
         public async Task CreateFloor(int warehouseID, WarehouseFloorRequestDTO requestDTO, IDbConnection? connection, IDbTransaction? transaction)
         {
             bool isNewConnection = false;
-            bool isNewTransaction = false; 
+            bool isNewTransaction = false;
             if (connection == null)
             {
                 connection = _db.CreateConnection();
@@ -82,64 +82,88 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task DeleteFloor(int? floorID, int? warehouseID)
+        public async Task DeleteFloor(int? floorID, int? warehouseID, IDbConnection? connection, IDbTransaction? transaction)
         {
+            bool isNewConnection = false;
+            bool isNewTransaction = false;
+
+            if (connection == null)
+            {
+                connection = _db.CreateConnection();
+                isNewConnection = true;
+            }
+            if (transaction == null)
+            {
+                transaction = connection.BeginTransaction();
+                isNewTransaction = true;
+            }
+
             try
             {
-                using (IDbConnection connection = _db.CreateConnection())
+                if (warehouseID.HasValue)
                 {
-                    connection.Open();
-                    using (var transaction = connection.BeginTransaction())
-                    {
-                        if (warehouseID.HasValue)
-                        {
-                            // Fetch floor IDs associated with the warehouse
-                            string fetchFloorsQuery = @"
+                    // Fetch floor IDs associated with the warehouse
+                    string fetchFloorsQuery = @"
                         SELECT warehouse_floor_id_pkey
                         FROM warehouse_floor
                         WHERE warehouse_id = @WarehouseID AND deleted = false;";
 
-                            var floorIDs = await connection.QueryAsync<int>(fetchFloorsQuery, new { WarehouseID = warehouseID }, transaction);
+                    var floorIDs = await connection.QueryAsync<int>(fetchFloorsQuery, new { WarehouseID = warehouseID }, transaction);
 
-                            foreach (var id in floorIDs)
-                            {
-                                await _roomRepository.DeleteRoom(null, id);
-                            }
-                        }
-                        else if (floorID.HasValue)
-                        {
-                            await _roomRepository.DeleteRoom(null, floorID);
-                        }
-                        else
-                        {
-                            throw new Exception("Invalid parameters");
-                        }
+                    foreach (var id in floorIDs)
+                    {
+                        await _roomRepository.DeleteRoom(null, id, connection, transaction);
+                    }
+                }
+                else if (floorID.HasValue)
+                {
+                    await _roomRepository.DeleteRoom(null, floorID, connection, transaction);
+                }
+                else
+                {
+                    throw new Exception("Invalid parameters");
+                }
 
-                        // Build the dynamic delete query
-                        string deleteQuery = @"
+                // Build the dynamic delete query
+                string deleteQuery = @"
                     UPDATE warehouse_floor
                     SET deleted = true";
 
-                        if (floorID.HasValue)
-                        {
-                            deleteQuery += " WHERE warehouse_floor_id_pkey = @FloorID";
-                        }
-                        else if (warehouseID.HasValue)
-                        {
-                            deleteQuery += " WHERE warehouse_id = @WarehouseID";
-                        }
-
-                        var parameters = new { FloorID = floorID, WarehouseID = warehouseID };
-
-                        await connection.ExecuteAsync(deleteQuery, parameters, transaction);
-
-                        transaction.Commit();
-                    }
+                if (floorID.HasValue)
+                {
+                    deleteQuery += " WHERE warehouse_floor_id_pkey = @FloorID";
                 }
+                else if (warehouseID.HasValue)
+                {
+                    deleteQuery += " WHERE warehouse_id = @WarehouseID";
+                }
+
+                var parameters = new { FloorID = floorID, WarehouseID = warehouseID };
+
+                await connection.ExecuteAsync(deleteQuery, parameters, transaction);
+
+                transaction.Commit();
             }
+
             catch (Exception ex)
             {
+                if (isNewTransaction)
+                {
+                    transaction.Rollback();
+                }
                 throw new Exception("Failed to delete floor", ex);
+            }
+            finally
+            {
+                if (isNewTransaction)
+                {
+                    transaction.Commit();
+                    transaction.Dispose();
+                }
+                if (isNewConnection)
+                {
+                    connection.Close();
+                }
             }
         }
 
@@ -203,12 +227,115 @@ namespace Inventory_Management_Backend.Repository
                 return floorResults.AsList();
             }
         }
-        public async Task UpdateFloor(int floorID, WarehouseFloorRequestDTO requestDTO)
+
+        public async Task CreateOrUpdateFloors(int warehouseID, List<WarehouseFloorRequestDTO> requestDTOs, IDbConnection? connection, IDbTransaction? transaction)
         {
-            using (IDbConnection connection = _db.CreateConnection())
+            bool isNewConnection = false;
+            bool isNewTransaction = false;
+            if (connection == null)
+            {
+                connection = _db.CreateConnection();
+                isNewConnection = true;
+            }
+            if (transaction == null)
             {
                 connection.Open();
+                transaction = connection.BeginTransaction();
+                isNewTransaction = true;
+            }
 
+            try
+            {
+                // Fetch existing floor IDs for the warehouse
+                string fetchFloorsQuery = @"
+                SELECT warehouse_floor_id_pkey
+                FROM warehouse_floor
+                WHERE warehouse_id = @WarehouseID AND deleted = false;";
+
+                var existingFloorIDs = (await connection.QueryAsync<int>(fetchFloorsQuery, new { WarehouseID = warehouseID }, transaction)).ToList();
+
+                // Process each floor in the request
+                foreach (var requestDTO in requestDTOs)
+                {
+                    if (requestDTO.FloorID.HasValue)
+                    {
+                        // Update existing floor
+                        await UpdateFloor(requestDTO.FloorID.Value, requestDTO, connection, transaction);
+                        existingFloorIDs.Remove(requestDTO.FloorID.Value); // Remove from the list of existing IDs
+                    }
+                    else
+                    {
+                        // Create new floor
+                        string createQuery = @"
+                    INSERT INTO warehouse_floor (floor_name, warehouse_id)
+                    VALUES (@FloorName, @WarehouseID)
+                    RETURNING warehouse_floor_id_pkey;";
+
+                        var parameters = new { FloorName = requestDTO.FloorName, WarehouseID = warehouseID };
+                        var floorID = await connection.QueryFirstOrDefaultAsync<int>(createQuery, parameters, transaction);
+
+                        if (floorID == 0)
+                        {
+                            throw new Exception("Failed to create floor");
+                        }
+
+                        // Add rooms if any
+                        if (requestDTO.Rooms != null && requestDTO.Rooms.Count > 0)
+                        {
+                            foreach (var room in requestDTO.Rooms)
+                            {
+                                await _roomRepository.CreateRoom(floorID, room, connection, transaction);
+                            }
+                        }
+                    }
+                }
+
+                // Delete floors that are not in the request
+                foreach (var floorID in existingFloorIDs)
+                {
+                    await DeleteFloor(floorID, null, connection, transaction);
+                }
+
+                if (isNewTransaction)
+                {
+                    transaction.Commit();
+                    transaction.Dispose();
+                }
+                if (isNewConnection)
+                {
+                    connection.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                if (isNewTransaction)
+                {
+                    transaction.Rollback();
+                }
+                throw new Exception("Transaction failed and rolled back", ex);
+            }
+        }
+
+        public async Task UpdateFloor(int floorID, WarehouseFloorRequestDTO requestDTO, IDbConnection? connection, IDbTransaction? transaction)
+        {
+            bool isNewConnection = false;
+            bool isNewTransaction = false;
+            if (connection == null)
+            {
+                connection = _db.CreateConnection();
+                isNewConnection = true;
+            }
+
+
+            if (transaction == null)
+            {
+                connection.Open();
+                transaction = connection.BeginTransaction();
+                isNewTransaction = true;
+            }
+
+            try
+            {
                 string updateQuery = @"
                     UPDATE warehouse_floor
                     SET floor_name = @FloorName
@@ -217,6 +344,24 @@ namespace Inventory_Management_Backend.Repository
                 var parameters = new { FloorName = requestDTO.FloorName, FloorID = floorID };
 
                 await connection.ExecuteAsync(updateQuery, parameters);
+            }
+            catch (Exception ex)
+            {
+                // Rollback the transaction if any error occurs
+                transaction.Rollback();
+                throw new Exception("Transaction failed and rolled back", ex);
+            }
+            finally
+            {
+                if (isNewTransaction)
+                {
+                    transaction.Commit();
+                    transaction.Dispose();
+                }
+                if (isNewConnection)
+                {
+                    connection.Close();
+                }
             }
         }
     }
