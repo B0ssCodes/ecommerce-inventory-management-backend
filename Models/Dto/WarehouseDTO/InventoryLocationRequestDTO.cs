@@ -3,6 +3,6 @@
     public class InventoryLocationRequestDTO
     {
         public int? BinID { get; set; }
-        public int ProductID { get; set; }
+        public int InventoryID { get; set; }
     }
 }

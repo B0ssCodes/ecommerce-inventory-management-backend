@@ -21,12 +21,12 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpGet]
-        [Route("get/{locationID}")]
-        public async Task<IActionResult> GetInventoryLocation(int locationID)
+        [Route("get/{inventoryID}")]
+        public async Task<IActionResult> GetInventoryLocation(int inventoryID)
         {
             try
             {
-                var result = await _inventoryLocationRepository.GetInventoryLocation(locationID);
+                var result = await _inventoryLocationRepository.GetInventoryLocation(inventoryID, null);
                 _response.StatusCode = HttpStatusCode.OK;
                 _response.IsSuccess = true;
                 _response.Message = "Inventory location retrieved successfully";

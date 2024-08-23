@@ -23,19 +23,12 @@ namespace Inventory_Management_Backend.Repository
             {
                 connection.Open();
 
-                int inventoryID = await _inventoryRepository.InventoryExists(requestDTO.ProductID);
-
-                if (inventoryID == 0)
-                {
-                    throw new Exception("Inventory not found");
-                }
-
                 string checkIfLocationExistsQuery = @"
                         SELECT inventory_location_id_pkey
                         FROM inventory_location
                         WHERE inventory_id = @InventoryID;";
 
-                var checkParameters = new { InventoryID = inventoryID };
+                var checkParameters = new { InventoryID = requestDTO.InventoryID };
 
                 int? locationID = await connection.QueryFirstOrDefaultAsync<int?>(checkIfLocationExistsQuery, checkParameters);
 
@@ -54,12 +47,12 @@ namespace Inventory_Management_Backend.Repository
 
                     if (requestDTO.BinID == null)
                     {
-                        var nullParameters = new { BinID = (int?)null, InventoryID = inventoryID };
+                        var nullParameters = new { BinID = (int?)null, InventoryID = requestDTO.InventoryID };
                         await connection.ExecuteAsync(createQuery, nullParameters);
                     }
                     else
                     {
-                        var parameters = new { BinID = requestDTO.BinID, InventoryID = inventoryID };
+                        var parameters = new { BinID = requestDTO.BinID, InventoryID = requestDTO.InventoryID };
                         await connection.ExecuteAsync(createQuery, parameters);
                     }
                 }
@@ -72,37 +65,45 @@ namespace Inventory_Management_Backend.Repository
             throw new NotImplementedException();
         }
 
-        public async Task<InventoryLocationResponseDTO> GetInventoryLocation(int locationID)
+        public async Task<InventoryLocationResponseDTO> GetInventoryLocation(int? inventoryID, int? locationID)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
                 connection.Open();
 
                 string selectQuery = @"
-            SELECT  il.inventory_location_id_pkey AS InventoryLocationID,
-                    il.inventory_id AS InventoryID, 
-                    b.warehouse_bin_id_pkey AS BinID,
-                    b.bin_name AS BinName,
-                    s.warehouse_shelf_id_pkey AS ShelfID,
-                    s.shelf_name AS ShelfName,
-                    a.warehouse_aisle_id_pkey AS AisleID,
-                    a.aisle_name AS AisleName,
-                    r.warehouse_room_id_pkey AS RoomID,
-                    r.room_name AS RoomName,
-                    f.warehouse_floor_id_pkey AS FloorID,
-                    f.floor_name AS FloorName,
-                    w.warehouse_id_pkey AS WarehouseID,
-                    w.warehouse_name AS WarehouseName
-            FROM inventory_location il
-            JOIN warehouse_bin b ON il.warehouse_bin_id = b.warehouse_bin_id_pkey
-            JOIN warehouse_shelf s ON b.warehouse_shelf_id = s.warehouse_shelf_id_pkey
-            JOIN warehouse_aisle a ON s.warehouse_aisle_id = a.warehouse_aisle_id_pkey
-            JOIN warehouse_room r ON a.warehouse_room_id = r.warehouse_room_id_pkey
-            JOIN warehouse_floor f ON r.warehouse_floor_id = f.warehouse_floor_id_pkey
-            JOIN warehouse w ON f.warehouse_id = w.warehouse_id_pkey
-            WHERE il.inventory_location_id_pkey = @LocationID;";
+                SELECT  il.inventory_location_id_pkey AS InventoryLocationID,
+                        il.inventory_id AS InventoryID, 
+                        b.warehouse_bin_id_pkey AS BinID,
+                        b.bin_name AS BinName,
+                        s.warehouse_shelf_id_pkey AS ShelfID,
+                        s.shelf_name AS ShelfName,
+                        a.warehouse_aisle_id_pkey AS AisleID,
+                        a.aisle_name AS AisleName,
+                        r.warehouse_room_id_pkey AS RoomID,
+                        r.room_name AS RoomName,
+                        f.warehouse_floor_id_pkey AS FloorID,
+                        f.floor_name AS FloorName,
+                        w.warehouse_id_pkey AS WarehouseID,
+                        w.warehouse_name AS WarehouseName
+                FROM inventory_location il
+                JOIN warehouse_bin b ON il.warehouse_bin_id = b.warehouse_bin_id_pkey
+                JOIN warehouse_shelf s ON b.warehouse_shelf_id = s.warehouse_shelf_id_pkey
+                JOIN warehouse_aisle a ON s.warehouse_aisle_id = a.warehouse_aisle_id_pkey
+                JOIN warehouse_room r ON a.warehouse_room_id = r.warehouse_room_id_pkey
+                JOIN warehouse_floor f ON r.warehouse_floor_id = f.warehouse_floor_id_pkey
+                JOIN warehouse w ON f.warehouse_id = w.warehouse_id_pkey";
 
-                var parameters = new { LocationID = locationID };
+                if (inventoryID != null)
+                {
+                    selectQuery += " WHERE il.inventory_id = @InventoryID;";
+                }
+                else if (locationID != null)
+                {
+                    selectQuery += " WHERE il.inventory_location_id_pkey = @LocationID";
+                }
+
+                var parameters = new {InventoryID = inventoryID, LocationID = locationID};
 
                 var inventoryLocation = await connection.QueryFirstOrDefaultAsync<InventoryLocationResponseDTO>(selectQuery, parameters);
 
@@ -115,7 +116,7 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task UpdateInventoryLocation(int locationID, InventoryLocationUpdateDTO updateDTO)
+        public async Task UpdateInventoryLocation(int inventoryID, InventoryLocationUpdateDTO updateDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
@@ -124,9 +125,9 @@ namespace Inventory_Management_Backend.Repository
                 string updateQuery = @"
                         UPDATE inventory_location
                         SET warehouse_bin_id = @BinID
-                        WHERE inventory_location_id_pkey = @LocationID;";
+                        WHERE inventory_id = @Inventory;";
 
-                var parameters = new { BinID = updateDTO.BinID, LocationID = locationID};
+                var parameters = new { BinID = updateDTO.BinID, InventoryID = inventoryID};
 
                 await connection.ExecuteAsync(updateQuery, parameters);
             }
