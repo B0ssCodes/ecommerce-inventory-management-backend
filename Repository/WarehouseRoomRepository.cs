@@ -3,6 +3,7 @@ using Inventory_Management_Backend.Data;
 using Inventory_Management_Backend.Models.Dto.WarehouseDTO;
 using Inventory_Management_Backend.Repository.IRepository;
 using System.Data;
+using System.Net;
 
 namespace Inventory_Management_Backend.Repository
 {
@@ -215,16 +216,155 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task UpdateRoom(int roomID, WarehouseRoomRequestDTO requestDTO, IDbConnection? connection, IDbTransaction? transaction)
+        public async Task CreateOrUpdateRooms(int floorID, List<WarehouseRoomRequestDTO> requestDTOs, IDbConnection? connection, IDbTransaction? transaction)
         {
-            string updateQuery = @"
+            bool isNewConnection = false;
+            bool isNewTransaction = false;
+            if (connection == null)
+            {
+                connection = _db.CreateConnection();
+                isNewConnection = true;
+            }
+            if (transaction == null)
+            {
+                connection.Open();
+                transaction = connection.BeginTransaction();
+                isNewTransaction = true;
+            }
+
+            try
+            {
+                // Fetch existing room IDs for the floor
+                string fetchRoomsQuery = @"
+            SELECT warehouse_room_id_pkey
+            FROM warehouse_room
+            WHERE warehouse_floor_id = @FloorID AND deleted = false;";
+
+                var existingRoomIDs = (await connection.QueryAsync<int>(fetchRoomsQuery, new { FloorID = floorID }, transaction)).ToList();
+
+                // Process each room in the request
+                foreach (var requestDTO in requestDTOs)
+                {
+                    if (requestDTO.RoomID.HasValue)
+                    {
+                        // Update existing room
+                        await UpdateRoom(requestDTO, connection, transaction);
+                        existingRoomIDs.Remove(requestDTO.RoomID.Value); // Remove from the list of existing IDs
+                    }
+                    else
+                    {
+                        // Create new room
+                        string createQuery = @"
+                    INSERT INTO warehouse_room (room_name, warehouse_floor_id)
+                    VALUES (@RoomName, @FloorID)
+                    RETURNING warehouse_room_id_pkey;";
+
+                        var parameters = new { RoomName = requestDTO.RoomName, FloorID = floorID };
+                        var roomID = await connection.QueryFirstOrDefaultAsync<int>(createQuery, parameters, transaction);
+
+                        if (roomID == 0)
+                        {
+                            throw new Exception("Failed to create room");
+                        }
+
+                        // Add aisles if any
+                        if (requestDTO.Aisles != null && requestDTO.Aisles.Count > 0)
+                        {
+                            foreach (var aisle in requestDTO.Aisles)
+                            {
+                                await _aisleRepository.CreateAisle(roomID, aisle, connection, transaction);
+                            }
+                        }
+                    }
+                }
+
+                // Delete rooms that are not in the request
+                foreach (var roomID in existingRoomIDs)
+                {
+                    await DeleteRoom(roomID, null, connection, transaction);
+                }
+
+                
+            }
+            catch (Exception ex)
+            {
+                if (isNewTransaction)
+                {
+                    transaction.Rollback();
+                }
+                throw new Exception("Transaction failed and rolled back", ex);
+            }
+            finally
+            {
+                if (isNewTransaction)
+                {
+                    transaction.Commit();
+                    transaction.Dispose();
+                }
+                if (isNewConnection)
+                {
+                    connection.Close();
+                }
+            }
+        }
+
+        public async Task UpdateRoom(WarehouseRoomRequestDTO requestDTO, IDbConnection? connection, IDbTransaction? transaction)
+        {
+            bool isNewConnection = false;
+            bool isNewTransaction = false;
+
+            if (connection == null)
+            {
+                connection = _db.CreateConnection();
+                isNewConnection = true;
+            }
+            if (transaction == null)
+            {
+                connection.Open();
+                transaction = connection.BeginTransaction();
+                isNewTransaction = true;
+            }
+            try
+            {
+                string updateQuery = @"
                     UPDATE warehouse_room
                     SET room_name = @RoomName
                     WHERE warehouse_room_id_pkey = @RoomID;";
 
-            var parameters = new { RoomName = requestDTO.RoomName, RoomID = roomID };
+                if (!requestDTO.RoomID.HasValue)
+                {
+                    throw new Exception("No Room ID Provided");
+                }
 
-            await connection.ExecuteAsync(updateQuery, parameters);
+                var parameters = new { RoomName = requestDTO.RoomName, RoomID = requestDTO.RoomID.Value };
+
+                await connection.ExecuteAsync(updateQuery, parameters);
+
+                if (requestDTO.Aisles != null && requestDTO.Aisles.Count > 0)
+                {
+                    await _aisleRepository.CreateOrUpdateAisles(requestDTO.RoomID.Value, requestDTO.Aisles, connection, transaction);
+                }
+                
+            }
+            catch (Exception ex)
+            {
+                // Rollback the transaction if any error occurs
+                transaction.Rollback();
+                throw new Exception("Transaction failed and rolled back", ex);
+            }
+            finally
+            {
+                if (isNewTransaction)
+                {
+                    transaction.Commit();
+                    transaction.Dispose();
+                }
+                if (isNewConnection)
+                {
+                    connection.Close();
+                }
+            }
+
         }
     }
 }

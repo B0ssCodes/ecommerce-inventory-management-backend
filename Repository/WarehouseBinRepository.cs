@@ -224,6 +224,89 @@ namespace Inventory_Management_Backend.Repository
             throw new NotImplementedException();
         }
 
+        public async Task CreateOrUpdateBins(int shelfID, List<WarehouseBinRequestDTO> requestDTOs, IDbConnection? connection, IDbTransaction? transaction)
+        {
+            bool isNewConnection = false;
+            bool isNewTransaction = false;
+            if (connection == null)
+            {
+                connection = _db.CreateConnection();
+                isNewConnection = true;
+            }
+            if (transaction == null)
+            {
+                connection.Open();
+                transaction = connection.BeginTransaction();
+                isNewTransaction = true;
+            }
+
+            try
+            {
+                // Fetch existing bin IDs for the shelf
+                string fetchBinsQuery = @"
+            SELECT warehouse_bin_id_pkey
+            FROM warehouse_bin
+            WHERE warehouse_shelf_id = @ShelfID AND deleted = false;";
+
+                var existingBinIDs = (await connection.QueryAsync<int>(fetchBinsQuery, new { ShelfID = shelfID }, transaction)).ToList();
+
+                // Process each bin in the request
+                foreach (var requestDTO in requestDTOs)
+                {
+                    if (requestDTO.BinID.HasValue)
+                    {
+                        // Update existing bin
+                        await UpdateBin(shelfID, requestDTO, connection, transaction);
+                        existingBinIDs.Remove(requestDTO.BinID.Value); // Remove from the list of existing IDs
+                    }
+                    else
+                    {
+                        // Create new bin
+                        string createQuery = @"
+                    INSERT INTO warehouse_bin (bin_name, bin_capacity, warehouse_shelf_id)
+                    VALUES (@BinName, @BinCapacity, @ShelfID)
+                    RETURNING warehouse_bin_id_pkey;";
+
+                        var parameters = new { BinName = requestDTO.BinName, BinCapacity = requestDTO.BinCapacity, ShelfID = shelfID };
+                        var binID = await connection.QueryFirstOrDefaultAsync<int>(createQuery, parameters, transaction);
+
+                        if (binID == 0)
+                        {
+                            throw new Exception("Failed to create bin");
+                        }
+                    }
+                }
+
+                // Delete bins that are not in the request
+                foreach (var binID in existingBinIDs)
+                {
+                    await DeleteBin(binID, null, connection, transaction);
+                }
+
+                if (isNewTransaction)
+                {
+                    transaction.Commit();
+                    transaction.Dispose();
+                }
+                if (isNewConnection)
+                {
+                    connection.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                // Rollback the transaction if any error occurs
+                transaction?.Rollback();
+                throw new Exception("Transaction failed and rolled back", ex);
+            }
+            finally
+            {
+                if (isNewConnection)
+                {
+                    connection.Close();
+                }
+            }
+        }
         public async Task UpdateBin(int shelfID, WarehouseBinRequestDTO requestDTO, IDbConnection? connection, IDbTransaction? transaction)
         {
             bool isNewConnection = false;

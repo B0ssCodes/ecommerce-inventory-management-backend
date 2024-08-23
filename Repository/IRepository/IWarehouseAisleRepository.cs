@@ -7,6 +7,7 @@ namespace Inventory_Management_Backend.Repository.IRepository
     {
         public Task<List<WarehouseAisleResponseDTO>> GetAisles(int roomID);
         public Task<WarehouseAisleResponseDTO> GetAisle(int aisleID);
+        public Task CreateOrUpdateAisles(int roomID, List<WarehouseAisleRequestDTO> requestDTOs, IDbConnection? connection, IDbTransaction? transaction);
         public Task CreateAisle(int roomID, WarehouseAisleRequestDTO requestDTO, IDbConnection? connection, IDbTransaction? transaction);
         public Task UpdateAisle(WarehouseAisleRequestDTO requestDTO, IDbConnection? connection, IDbTransaction? transaction);
         public Task DeleteAisle(int? aisleID, int? roomID, IDbConnection? connection, IDbTransaction? transaction);

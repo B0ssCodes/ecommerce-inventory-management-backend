@@ -260,7 +260,7 @@ namespace Inventory_Management_Backend.Repository
                     if (requestDTO.FloorID.HasValue)
                     {
                         // Update existing floor
-                        await UpdateFloor(requestDTO.FloorID.Value, requestDTO, connection, transaction);
+                        await UpdateFloor(requestDTO, connection, transaction);
                         existingFloorIDs.Remove(requestDTO.FloorID.Value); // Remove from the list of existing IDs
                     }
                     else
@@ -316,7 +316,7 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task UpdateFloor(int floorID, WarehouseFloorRequestDTO requestDTO, IDbConnection? connection, IDbTransaction? transaction)
+        public async Task UpdateFloor(WarehouseFloorRequestDTO requestDTO, IDbConnection? connection, IDbTransaction? transaction)
         {
             bool isNewConnection = false;
             bool isNewTransaction = false;
@@ -341,9 +341,19 @@ namespace Inventory_Management_Backend.Repository
                     SET floor_name = @FloorName
                     WHERE warehouse_floor_id_pkey = @FloorID;";
 
-                var parameters = new { FloorName = requestDTO.FloorName, FloorID = floorID };
+                if (!requestDTO.FloorID.HasValue)
+                {
+                    throw new Exception("No Floor ID Provided");
+                }
+
+                var parameters = new { FloorName = requestDTO.FloorName, FloorID = requestDTO.FloorID.Value };
 
                 await connection.ExecuteAsync(updateQuery, parameters);
+
+                if (requestDTO.Rooms != null && requestDTO.Rooms.Count > 0)
+                {
+                    await _roomRepository.CreateOrUpdateRooms(requestDTO.FloorID.Value, requestDTO.Rooms, connection, transaction);
+                }
             }
             catch (Exception ex)
             {

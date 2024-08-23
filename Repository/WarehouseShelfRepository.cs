@@ -220,6 +220,94 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
+        public async Task CreateOrUpdateShelves(int aisleID, List<WarehouseShelfRequestDTO> requestDTOs, IDbConnection? connection, IDbTransaction? transaction)
+        {
+            bool isNewConnection = false;
+            bool isNewTransaction = false;
+            if (connection == null)
+            {
+                connection = _db.CreateConnection();
+                isNewConnection = true;
+            }
+            if (transaction == null)
+            {
+                connection.Open();
+                transaction = connection.BeginTransaction();
+                isNewTransaction = true;
+            }
+
+            try
+            {
+                // Fetch existing shelf IDs for the aisle
+                string fetchShelvesQuery = @"
+            SELECT warehouse_shelf_id_pkey
+            FROM warehouse_shelf
+            WHERE warehouse_aisle_id = @AisleID AND deleted = false;";
+
+                var existingShelfIDs = (await connection.QueryAsync<int>(fetchShelvesQuery, new { AisleID = aisleID }, transaction)).ToList();
+
+                // Process each shelf in the request
+                foreach (var requestDTO in requestDTOs)
+                {
+                    if (requestDTO.ShelfID.HasValue)
+                    {
+                        // Update existing shelf
+                        await UpdateShelf(aisleID, requestDTO, connection, transaction);
+                        existingShelfIDs.Remove(requestDTO.ShelfID.Value); // Remove from the list of existing IDs
+                    }
+                    else
+                    {
+                        // Create new shelf
+                        string createQuery = @"
+                    INSERT INTO warehouse_shelf (shelf_name, warehouse_aisle_id)
+                    VALUES (@ShelfName, @AisleID)
+                    RETURNING warehouse_shelf_id_pkey;";
+
+                        var parameters = new { ShelfName = requestDTO.ShelfName, AisleID = aisleID };
+                        var shelfID = await connection.QueryFirstOrDefaultAsync<int>(createQuery, parameters, transaction);
+
+                        if (shelfID == 0)
+                        {
+                            throw new Exception("Failed to create shelf");
+                        }
+
+                        // Add bins if any
+                        if (requestDTO.Bins != null && requestDTO.Bins.Count > 0)
+                        {
+                            foreach (var bin in requestDTO.Bins)
+                            {
+                                await _warehouseBinRepository.CreateBin(shelfID, bin, connection, transaction);
+                            }
+                        }
+                    }
+                }
+
+                // Delete shelves that are not in the request
+                foreach (var shelfID in existingShelfIDs)
+                {
+                    await DeleteShelf(shelfID, null, connection, transaction);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Rollback the transaction if any error occurs
+                transaction?.Rollback();
+                throw new Exception("Transaction failed and rolled back", ex);
+            }
+            finally
+            {
+                if (isNewTransaction)
+                {
+                    transaction.Commit();
+                    transaction.Dispose();
+                }
+                if (isNewConnection)
+                {
+                    connection.Close();
+                }
+
+            }
+        }
         public async Task UpdateShelf(int aisleID, WarehouseShelfRequestDTO requestDTO, IDbConnection? connection, IDbTransaction? transaction)
         {
 
@@ -243,7 +331,12 @@ namespace Inventory_Management_Backend.Repository
                         UPDATE warehouse_shelf
                         SET shelf_name = @ShelfName,
                             warehouse_aisle_id = @AisleID
-                        WHERE warehouse_shelf_id = @ShelfID;";
+                        WHERE warehouse_shelf_id_pkey = @ShelfID;";
+
+                if (!requestDTO.ShelfID.HasValue)
+                {
+                    throw new Exception("No Shelf ID Provided");
+                }
 
                 var parameters = new
                 {
@@ -253,6 +346,11 @@ namespace Inventory_Management_Backend.Repository
                 };
 
                 await connection.ExecuteAsync(query, parameters, transaction);
+
+                if (requestDTO.Bins != null && requestDTO.Bins.Count > 0)
+                {
+                    await _warehouseBinRepository.CreateOrUpdateBins(requestDTO.ShelfID.Value, requestDTO.Bins, connection, transaction);
+                }
             }
             catch (Exception ex)
             {
