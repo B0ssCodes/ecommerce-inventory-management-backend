@@ -158,21 +158,24 @@ namespace Inventory_Management_Backend.Repository
         };
 
                 var baseQuery = @"
-        WITH InventoryCTE AS (
-            SELECT i.inventory_id_pkey AS InventoryID,
-                   i.inventory_stock AS Quantity,
-                   i.inventory_cost AS Price,
-                   p.product_id_pkey AS ProductID,
-                   p.product_name AS ProductName,
-                   p.sku AS ProductSKU,
-                   p.product_cost_price AS ProductPrice,
-                   COUNT(*) OVER() AS TotalCount
-            FROM inventory i
-            JOIN product p ON i.product_id = p.product_id_pkey
-            WHERE (@SearchQuery IS NULL OR p.product_name ILIKE '%' || @SearchQuery || '%'
-                    OR p.sku ILIKE '%' || @SearchQuery || '%'
-                    OR CAST(i.inventory_stock AS TEXT) ILIKE '%' || @SearchQuery || '%')
-        ";
+    WITH InventoryCTE AS (
+        SELECT i.inventory_id_pkey AS InventoryID,
+               i.inventory_stock AS Quantity,
+               i.inventory_cost AS Price,
+               b.bin_name AS BinName,
+               p.product_id_pkey AS ProductID,
+               p.product_name AS ProductName,
+               p.sku AS ProductSKU,
+               p.product_cost_price AS ProductPrice,
+               COUNT(*) OVER() AS TotalCount
+        FROM inventory i
+        JOIN product p ON i.product_id = p.product_id_pkey
+        LEFT JOIN inventory_location il ON i.inventory_id_pkey = il.inventory_id
+        LEFT JOIN warehouse_bin b ON il.warehouse_bin_id = b.warehouse_bin_id_pkey
+        WHERE (@SearchQuery IS NULL OR p.product_name ILIKE '%' || @SearchQuery || '%'
+                OR p.sku ILIKE '%' || @SearchQuery || '%'
+                OR CAST(i.inventory_stock AS TEXT) ILIKE '%' || @SearchQuery || '%')
+    ";
 
                 // Add dynamic filters
                 if (paginationParams.Filters != null && paginationParams.Filters.Count > 0)
@@ -191,7 +194,7 @@ namespace Inventory_Management_Backend.Repository
                 }
 
                 baseQuery += @")
-        SELECT InventoryID, Quantity, Price, ProductID, ProductName, ProductSKU, ProductPrice, TotalCount
+        SELECT InventoryID, Quantity, Price, BinName, ProductID, ProductName, ProductSKU, ProductPrice, TotalCount
         FROM InventoryCTE";
 
                 if (paginationParams.SortBy != null)

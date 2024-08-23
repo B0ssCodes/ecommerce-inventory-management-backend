@@ -30,19 +30,38 @@ namespace Inventory_Management_Backend.Repository
                     throw new Exception("Inventory not found");
                 }
 
-                string createQuery = @"
-                        INSERT INTO inventory_location(warehouse_bin_id, inventory_id)
-                        VALUES (@BinID, @InventoryID);";
+                string checkIfLocationExistsQuery = @"
+                        SELECT inventory_location_id_pkey
+                        FROM inventory_location
+                        WHERE inventory_id = @InventoryID;";
 
-                if (requestDTO.BinID == null)
+                var checkParameters = new { InventoryID = inventoryID };
+
+                int? locationID = await connection.QueryFirstOrDefaultAsync<int?>(checkIfLocationExistsQuery, checkParameters);
+
+                if (locationID != null)
                 {
-                    var nullParameters = new { BinID = (int?)null, InventoryID = inventoryID };
-                    await connection.ExecuteAsync(createQuery, nullParameters);
+                    if (requestDTO.BinID != null && requestDTO.BinID.Value > 0)
+                    {
+                        await UpdateInventoryLocation((int)locationID, new InventoryLocationUpdateDTO { BinID = requestDTO.BinID.Value });
+                    }
                 }
                 else
                 {
-                    var parameters = new { BinID = requestDTO.BinID, InventoryID = inventoryID };
-                    await connection.ExecuteAsync(createQuery, parameters);
+                    string createQuery = @"
+                        INSERT INTO inventory_location(warehouse_bin_id, inventory_id)
+                        VALUES (@BinID, @InventoryID);";
+
+                    if (requestDTO.BinID == null)
+                    {
+                        var nullParameters = new { BinID = (int?)null, InventoryID = inventoryID };
+                        await connection.ExecuteAsync(createQuery, nullParameters);
+                    }
+                    else
+                    {
+                        var parameters = new { BinID = requestDTO.BinID, InventoryID = inventoryID };
+                        await connection.ExecuteAsync(createQuery, parameters);
+                    }
                 }
 
             }

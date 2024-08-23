@@ -1,5 +1,6 @@
 ﻿using Inventory_Management_Backend.Models;
 using Inventory_Management_Backend.Models.Dto.WarehouseDTO;
+using Inventory_Management_Backend.Repository;
 using Inventory_Management_Backend.Repository.IRepository;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -13,10 +14,26 @@ namespace Inventory_Management_Backend.Controllers
     {
         private readonly ApiResponse _response;
         private readonly IWarehouseRepository _warehouseRepository;
+        private readonly IWarehouseFloorRepository _warehouseFloorRepository;
+        private readonly IWarehouseRoomRepository _warehouseRoomRepository;
+        private readonly IWarehouseAisleRepository _warehouseAisleRepository;
+        private readonly IWarehouseShelfRepository _warehouseShelfRepository;
+        private readonly IWarehouseBinRepository _warehouseBinRepository;
 
-        public WarehouseController(IWarehouseRepository warehouseRepository, ApiResponse response)
+        public WarehouseController(IWarehouseRepository warehouseRepository,
+                                   IWarehouseFloorRepository warehouseFloorRepository,
+                                   IWarehouseRoomRepository warehouseRoomRepository,
+                                   IWarehouseAisleRepository warehouseAisleRepository,
+                                   IWarehouseShelfRepository warehouseShelfRepository,
+                                   IWarehouseBinRepository warehouseBinRepository,
+                                   ApiResponse response)
         {
             _warehouseRepository = warehouseRepository;
+            _warehouseFloorRepository = warehouseFloorRepository;
+            _warehouseRoomRepository = warehouseRoomRepository;
+            _warehouseAisleRepository = warehouseAisleRepository;
+            _warehouseShelfRepository = warehouseShelfRepository;
+            _warehouseBinRepository = warehouseBinRepository;
             _response = response;
         }
 
@@ -125,6 +142,121 @@ namespace Inventory_Management_Backend.Controllers
                 _response.IsSuccess = true;
                 _response.Message = "Warehouse deleted successfully";
                 _response.Result = default;
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                _response.Result = default;
+                return BadRequest(_response);
+            }
+        }
+
+        [HttpGet]
+        [Route("get/floors/{warehouseID}")]
+        public async Task<IActionResult> GetFloors(int warehouseID)
+        {
+            try
+            {
+                var result = await _warehouseFloorRepository.GetFloors(warehouseID);
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "Floors retrieved successfully";
+                _response.Result = result;
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                _response.Result = default;
+                return BadRequest(_response);
+            }
+        }
+
+        [HttpGet]
+        [Route("get/rooms/{floorID}")]
+        public async Task<IActionResult> GetRooms(int floorID)
+        {
+            try
+            {
+                var result = await _warehouseRoomRepository.GetRooms(floorID);
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "Rooms retrieved successfully";
+                _response.Result = result;
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                _response.Result = default;
+                return BadRequest(_response);
+            }
+        }
+
+        [HttpGet]
+        [Route("get/aisles/{roomID}")]
+        public async Task<IActionResult> GetAisles(int roomID)
+        {
+            try
+            {
+                var result = await _warehouseAisleRepository.GetAisles(roomID);
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "Aisles retrieved successfully";
+                _response.Result = result;
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                _response.Result = default;
+                return BadRequest(_response);
+            }
+        }
+
+        [HttpGet]
+        [Route("get/shelves/{aisleID}")]
+        public async Task<IActionResult> GetShelves(int aisleID)
+        {
+            try
+            {
+                var result = await _warehouseShelfRepository.GetShelves(aisleID);
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "Shelves retrieved successfully";
+                _response.Result = result;
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                _response.Result = default;
+                return BadRequest(_response);
+            }
+        }
+
+        [HttpGet]
+        [Route("get/bins/{shelfID}")]
+        public async Task<IActionResult> GetBins(int shelfID)
+        {
+            try
+            {
+                var result = await _warehouseBinRepository.GetBins(shelfID);
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "Bins retrieved successfully";
+                _response.Result = result;
                 return Ok(_response);
             }
             catch (Exception ex)
