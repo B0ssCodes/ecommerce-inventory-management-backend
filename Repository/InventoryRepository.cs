@@ -38,25 +38,60 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task<int> CreateInventory(int productID)
+        public async Task<int> CreateInventory(int productID, IDbConnection? connection, IDbTransaction? transaction)
         {
-            using (IDbConnection connection = _db.CreateConnection())
-            {
-                connection.Open();
+            bool isNewConnection = false;
+            bool isNewTransaction = false;
 
+            if (connection == null)
+            {
+                connection = _db.CreateConnection();
+                connection.Open();
+                isNewConnection = true;
+            }
+            if (transaction == null)
+            {
+                transaction = connection.BeginTransaction();
+            }
+
+            try
+            {
                 var query = @"
                     INSERT INTO inventory (inventory_stock, inventory_cost, product_id)
                     VALUES (@Quantity, @Price, @ProductID)
                     RETURNING inventory_id_pkey as InventoryID;";
 
-                int result = await connection.QueryFirstOrDefaultAsync<int>(query, new
+                var parameters = new
                 {
                     Quantity = 0,
                     Price = 0,
                     ProductID = productID
-                });
+                };
+
+                int result = await connection.QueryFirstOrDefaultAsync<int>(query, parameters, transaction);
 
                 return result;
+            }
+                
+            catch (Exception ex)
+            {
+                if (isNewTransaction)
+                {
+                    transaction.Rollback();
+                }
+                throw new Exception("Error while creating inventory");
+            }
+            finally
+            {
+                if (isNewTransaction)
+                {
+                    transaction.Commit();
+                    transaction.Dispose();
+                }
+                if (isNewConnection)
+                {
+                    connection.Close();
+                }
             }
         }
 
@@ -100,21 +135,39 @@ namespace Inventory_Management_Backend.Repository
                     // If the quantity in stock is greater than the quantity requested, decrease the inventory
                     else
                     {
-                        var query = @"
+                        var getCostQuery = @"
+                            SELECT p.product_cost_price
+                            FROM product p 
+                            JOIN inventory i
+                            ON p.product_id_pkey = i.product_id
+                            WHERE i.inventory_id_pkey = @InventoryID;";
+
+                        decimal? cost = connection.QueryFirstOrDefault<int>(getCostQuery, quantityParameters, transaction);
+
+                        if (cost == null)
+                        {
+                            throw new Exception("Product not found");
+                        }
+
+                        if (cost.HasValue)
+                        {
+                            decimal newCost = cost.Value * requestDTO.Quantity;
+
+                            var query = @"
                             UPDATE inventory
                             SET inventory_stock = inventory_stock - @Quantity,
                              inventory_cost = inventory_cost - @Price
                             WHERE inventory_id_pkey = @InventoryID;";
 
-                        var parameters = new
-                        {
-                            Quantity = requestDTO.Quantity,
-                            Price = requestDTO.Price,
-                            InventoryID = inventoryID,
-                        };
+                            var parameters = new
+                            {
+                                Quantity = requestDTO.Quantity,
+                                Price = newCost,
+                                InventoryID = inventoryID,
+                            };
 
-                        await connection.ExecuteAsync(query, parameters, transaction);
-
+                            await connection.ExecuteAsync(query, parameters, transaction);
+                        }
                     }
 
                     transaction.Commit();

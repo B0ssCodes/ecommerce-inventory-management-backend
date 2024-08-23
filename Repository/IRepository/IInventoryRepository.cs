@@ -1,5 +1,6 @@
 ﻿using Inventory_Management_Backend.Models;
 using Inventory_Management_Backend.Models.Dto;
+using System.Data;
 
 namespace Inventory_Management_Backend.Repository.IRepository
 {
@@ -23,7 +24,7 @@ namespace Inventory_Management_Backend.Repository.IRepository
         public Task<int> GetOutStockInventoriesCount();
 
         // Creates a new inventory based on the product ID
-        public Task<int> CreateInventory(int productID);
+        public Task<int> CreateInventory(int productID, IDbConnection? connection, IDbTransaction? transaction);
 
         // Increases the inventory based on the inventory ID (if transaction type is Inbound)
         public Task IncreaseInventory(int inventoryID,TransactionItemRequestDTO requestDTO);

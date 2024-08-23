@@ -122,18 +122,7 @@ namespace Inventory_Management_Backend.Repository
                             }, transaction);
                         }
 
-                            await _inventoryRepository.CreateInventory(insertedProduct.ProductID);
-
-                        int inventoryID = await _inventoryRepository.InventoryExists(insertedProduct.ProductID);
-
-                        if (inventoryID == 0)
-                        {
-                            throw new Exception("Inventory does not exist");
-                        }
-                        else
-                        {
-
-                        }
+                            await _inventoryRepository.CreateInventory(insertedProduct.ProductID, connection, transaction);
 
                         // Commit the transaction
                         transaction.Commit();
