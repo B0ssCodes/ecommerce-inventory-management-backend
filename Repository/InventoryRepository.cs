@@ -450,7 +450,7 @@ namespace Inventory_Management_Backend.Repository
                     JOIN product p ON i.product_id = p.product_id_pkey
                     WHERE inventory_stock < @MinStockQuantity
                     AND inventory_stock > 0 
-                    p.deleted = false;";
+                    AND p.deleted = false;";
 
                 var parameters = new { MinStockQuantity = minStockQuantity };
 
