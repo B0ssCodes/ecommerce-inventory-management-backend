@@ -228,6 +228,8 @@ namespace Inventory_Management_Backend.Repository
         WHERE (@SearchQuery IS NULL OR p.product_name ILIKE '%' || @SearchQuery || '%'
                 OR p.sku ILIKE '%' || @SearchQuery || '%'
                 OR CAST(i.inventory_stock AS TEXT) ILIKE '%' || @SearchQuery || '%')
+        AND p.deleted = false
+        AND i.inventory_stock > 0
     ";
 
                 // Add dynamic filters
@@ -355,7 +357,9 @@ namespace Inventory_Management_Backend.Repository
                     WHERE (@SearchQuery IS NULL OR p.product_name ILIKE '%' || @SearchQuery || '%'
                             OR p.sku ILIKE '%' || @SearchQuery || '%'
                             OR CAST(i.inventory_stock AS TEXT) ILIKE '%' || @SearchQuery || '%')
+                            AND p.deleted = false
                             AND i.inventory_stock < @MinStockQuantity
+                            AND i.inventory_stock > 0
                     )   
                     SELECT InventoryID, Quantity, Price, ProductID, ProductName, ProductSKU, ProductPrice, TotalCount
                     FROM InventoryCTE
@@ -403,7 +407,8 @@ namespace Inventory_Management_Backend.Repository
                        COUNT(*) OVER() AS TotalCount
                 FROM product p
                 LEFT JOIN inventory i ON p.product_id_pkey = i.product_id
-                WHERE i.inventory_stock = 0 OR i.inventory_stock IS NULL
+                WHERE i.inventory_stock = 0
+                  AND p.deleted = false
                   AND (@SearchQuery IS NULL OR p.product_name ILIKE '%' || @SearchQuery || '%'
                        OR p.sku ILIKE '%' || @SearchQuery || '%'
                        OR CAST(p.product_cost_price AS TEXT) ILIKE '%' || @SearchQuery || '%')
@@ -440,9 +445,12 @@ namespace Inventory_Management_Backend.Repository
             using (IDbConnection connection = _db.CreateConnection())
             {
                 var query = @"
-                    SELECT COUNT(*) OVER()
-                    FROM inventory
-                    WHERE inventory_stock < @MinStockQuantity;";
+                    SELECT COUNT(inventory_id_pkey) OVER()
+                    FROM inventory i 
+                    JOIN product p ON i.product_id = p.product_id_pkey
+                    WHERE inventory_stock < @MinStockQuantity
+                    AND inventory_stock > 0 
+                    p.deleted = false;";
 
                 var parameters = new { MinStockQuantity = minStockQuantity };
 
@@ -462,7 +470,8 @@ namespace Inventory_Management_Backend.Repository
                     SELECT COUNT(*)
                     FROM product p
                     LEFT JOIN inventory i ON p.product_id_pkey = i.product_id
-                    WHERE i.inventory_stock = 0 OR i.inventory_stock IS NULL;";
+                    WHERE i.inventory_stock = 0
+                    AND p.deleted = false;";
 
                 int result = await connection.QueryFirstOrDefaultAsync<int>(query);
 

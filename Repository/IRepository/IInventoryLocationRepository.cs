@@ -9,7 +9,7 @@ namespace Inventory_Management_Backend.Repository.IRepository
 
         public Task DeleteInventoryLocation(int locationID);
 
-        public Task UpdateInventoryLocation(int locationID, InventoryLocationUpdateDTO updateDTO);
+        public Task UpdateInventoryLocation(InventoryLocationRequestDTO requestDTO);
 
     }
 }

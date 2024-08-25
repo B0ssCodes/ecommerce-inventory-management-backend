@@ -91,7 +91,7 @@ namespace Inventory_Management_Backend.Repository
             FROM user_role ur
             LEFT JOIN user_role_permission urp ON ur.user_role_id_pkey = urp.user_role_id
             LEFT JOIN user_permission up ON up.user_permission_id_pkey = urp.user_permission_id
-            WHERE ur.user_role_id_pkey = @UserRoleID";
+            WHERE ur.user_role_id_pkey = @UserRoleID AND deleted = false";
 
                 var parameters = new { UserRoleID = userRoleId };
 
@@ -135,6 +135,7 @@ namespace Inventory_Management_Backend.Repository
                     COUNT(*) OVER() AS TotalCount
                 FROM user_role
                 WHERE @Search IS NULL OR role ILIKE '%' || @Search || '%'
+                AND deleted = false
             )
             SELECT 
                 UserRoleID, 

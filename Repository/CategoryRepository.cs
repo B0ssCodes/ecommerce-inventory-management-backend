@@ -79,6 +79,7 @@ namespace Inventory_Management_Backend.Repository
             WHERE (@SearchQuery IS NULL OR 
                    category_name ILIKE '%' || @SearchQuery || '%' OR 
                    category_description ILIKE '%' || @SearchQuery || '%')
+            AND deleted = false
 
         ";
 

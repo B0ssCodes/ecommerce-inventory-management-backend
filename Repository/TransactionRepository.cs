@@ -354,6 +354,34 @@ namespace Inventory_Management_Backend.Repository
                 return (transactions, totalCount);
             }
         }
+
+        public async Task<int> GetOutboundTransactionsCount()
+        {
+            using (IDbConnection connection = _db.CreateConnection())
+            {
+                connection.Open();
+
+                // Get the first day of the current month
+                DateTime firstDayOfMonth = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+
+                string query = @"
+            SELECT COUNT(*) 
+            FROM transaction    
+            WHERE transaction_type_id = @TypeID
+            AND transaction_status_id = @Status
+            AND transaction_date >= @FirstDayOfMonth;";
+
+                var parameters = new
+                {
+                    TypeID = (int)TransactionTypeEnum.Outbound,
+                    Status = (int)TransactionStatusEnum.Submitted,
+                    FirstDayOfMonth = firstDayOfMonth
+                };
+
+                int count = await connection.QueryFirstOrDefaultAsync<int>(query, parameters);
+                return count;
+            }
+        }
         public async Task SubmitTransaction(TransactionSubmitDTO transactionDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())

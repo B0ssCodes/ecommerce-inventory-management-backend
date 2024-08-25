@@ -65,26 +65,6 @@ namespace Inventory_Management_Backend.Controllers
 
         }
 
-        [HttpPut]
-        [Route("update/{locationID}")]
-        public async Task<IActionResult> UpdateInventoryLocation(int locationID, InventoryLocationUpdateDTO updateDTO)
-        {
-            try
-            {
-                await _inventoryLocationRepository.UpdateInventoryLocation(locationID, updateDTO);
-                _response.StatusCode = HttpStatusCode.OK;
-                _response.IsSuccess = true;
-                _response.Message = "Inventory location updated successfully";
-                return Ok(_response);
-            }
-            catch (Exception ex)
-            {
-                _response.StatusCode = HttpStatusCode.BadRequest;
-                _response.IsSuccess = false;
-                _response.Message = ex.Message;
-                return BadRequest(_response);
-            }
-        }
 
         [HttpDelete]
         [Route("delete/{locationID}")]

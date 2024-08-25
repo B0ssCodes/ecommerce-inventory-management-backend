@@ -148,6 +148,7 @@ namespace Inventory_Management_Backend.Repository
                 SELECT 1
                 FROM inventory
                 WHERE product_id = @ProductID
+                AND inventory_stock > 0
             )";
 
                 var inventoryExists = await connection.ExecuteScalarAsync<bool>(checkInventoryQuery, new { ProductID = productID });

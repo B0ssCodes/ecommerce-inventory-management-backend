@@ -55,7 +55,7 @@ public class UserLoggingMiddleware
             {
                 id = int.Parse(pathSegments[3]);
                 beforeStateJson = JsonSerializer.Serialize(await productRepository.GetProduct(id));
-                afterStateJson = JsonSerializer.Serialize(new { product = "updated sucessfully" });
+                afterStateJson = JsonSerializer.Serialize(new { product = "updated successfully" });
             }
             else if (model == "mv")
             {
@@ -142,9 +142,9 @@ public class UserLoggingMiddleware
                         break;
                 }
             }
-            else if ((action.StartsWith("get", StringComparison.OrdinalIgnoreCase) && pathSegments.Length > 3) || action == "getLowCount" || action == "getoutCount")
+            else if ((action.StartsWith("get", StringComparison.OrdinalIgnoreCase) && pathSegments.Length > 3) || action == "getLowCount" || action == "getoutCount" || action == "getCount")
             {
-                if (action !="getoutCount" && int.TryParse(pathSegments[3], out id) && id != 0)
+                if (action != "getoutCount" && action!= "getCount" && int.TryParse(pathSegments[3], out id) && id != 0)
                 {
                     beforeStateJson = JsonSerializer.Serialize(new { requested = $"{model} with id {id}" });
                 }
@@ -162,24 +162,14 @@ public class UserLoggingMiddleware
                 }
             }
 
-            int userId = 0;
+            string userEmail = "unknown@mail.com";
             string token = httpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
             if (!string.IsNullOrWhiteSpace(token))
             {
-                // Get the user ID from the passed JWT Token
+                // Get the user's first name from the passed JWT Token
                 var handler = new JwtSecurityTokenHandler();
                 var jwtToken = handler.ReadJwtToken(token);
-                string userIdString = jwtToken.Claims.FirstOrDefault(claim => claim.Type == ClaimTypes.NameIdentifier)?.Value;
-
-                // Convert userId to integer
-                if (!int.TryParse(userIdString, out userId))
-                {
-                    _logger.LogError("Invalid User ID: {UserIdString}", userIdString);
-                }
-            }
-            else
-            {
-                userId = 1;
+                userEmail = jwtToken.Claims.FirstOrDefault(claim => claim.Type == ClaimTypes.Email)?.Value ?? "unknown@mail.com";
             }
 
             // Get the response body
@@ -203,10 +193,10 @@ public class UserLoggingMiddleware
                     }
 
                     string dateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                    string logName = $"{model} {action} by {userId} : {dateTime} ";
+                    string logName = $"{model} {action} by {userEmail} : {dateTime} ";
                     UserLogRequestDTO requestDTO = new UserLogRequestDTO
                     {
-                        UserID = userId,
+                        UserID = 0, 
                         LogName = logName,
                         Action = action,
                         Model = model,

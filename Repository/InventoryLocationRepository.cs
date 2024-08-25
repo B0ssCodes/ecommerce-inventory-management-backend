@@ -32,31 +32,48 @@ namespace Inventory_Management_Backend.Repository
 
                 int? locationID = await connection.QueryFirstOrDefaultAsync<int?>(checkIfLocationExistsQuery, checkParameters);
 
+                string getBinCapacityQuery = @"
+                        SELECT bin_capacity
+                        FROM warehouse_bin
+                        WHERE warehouse_bin_id_pkey = @BinID;";
+
+                int binCapacity = await connection.QueryFirstOrDefaultAsync<int>(getBinCapacityQuery, new { BinID = requestDTO.BinID });
+
+                string getInventoryStockQuery = @"
+                        SELECT inventory_stock
+                        FROM inventory
+                        WHERE inventory_id_pkey = @InventoryID;";
+
+                int inventoryStock = await connection.QueryFirstOrDefaultAsync<int>(getInventoryStockQuery, new { InventoryID = requestDTO.InventoryID });
+
+                if (inventoryStock > binCapacity)
+                {
+                    throw new Exception("Inventory Stock exceeds bin capacity!");
+                }
+
                 if (locationID != null)
                 {
-                    if (requestDTO.BinID != null && requestDTO.BinID.Value > 0)
-                    {
-                        await UpdateInventoryLocation((int)locationID, new InventoryLocationUpdateDTO { BinID = requestDTO.BinID.Value });
-                    }
+                    await UpdateInventoryLocation(requestDTO);
                 }
                 else
                 {
                     string createQuery = @"
-                        INSERT INTO inventory_location(warehouse_bin_id, inventory_id)
-                        VALUES (@BinID, @InventoryID);";
+                    INSERT INTO inventory_location(warehouse_id, warehouse_floor_id, warehouse_room_id, warehouse_aisle, warehouse_shelf_id, warehouse_bin_id, inventory_id)
+                    VALUES (@WarehouseID, @FloorID, @RoomID, @AisleID, @ShelfID, @BinID, @InventoryID);";
 
-                    if (requestDTO.BinID == null)
+                    var parameters = new
                     {
-                        var nullParameters = new { BinID = (int?)null, InventoryID = requestDTO.InventoryID };
-                        await connection.ExecuteAsync(createQuery, nullParameters);
-                    }
-                    else
-                    {
-                        var parameters = new { BinID = requestDTO.BinID, InventoryID = requestDTO.InventoryID };
-                        await connection.ExecuteAsync(createQuery, parameters);
-                    }
+                        WarehouseID = requestDTO.WarehouseID,
+                        FloorID = requestDTO.FloorID,
+                        RoomID = requestDTO.RoomID,
+                        AisleID = requestDTO.AisleID,
+                        ShelfID = requestDTO.ShelfID,
+                        BinID = requestDTO.BinID,
+                        InventoryID = requestDTO.InventoryID
+                    };
+
+                    await connection.ExecuteAsync(createQuery, parameters);
                 }
-
             }
         }
 
@@ -72,27 +89,27 @@ namespace Inventory_Management_Backend.Repository
                 connection.Open();
 
                 string selectQuery = @"
-                SELECT  il.inventory_location_id_pkey AS InventoryLocationID,
-                        il.inventory_id AS InventoryID, 
-                        b.warehouse_bin_id_pkey AS BinID,
-                        b.bin_name AS BinName,
-                        s.warehouse_shelf_id_pkey AS ShelfID,
-                        s.shelf_name AS ShelfName,
-                        a.warehouse_aisle_id_pkey AS AisleID,
-                        a.aisle_name AS AisleName,
-                        r.warehouse_room_id_pkey AS RoomID,
-                        r.room_name AS RoomName,
-                        f.warehouse_floor_id_pkey AS FloorID,
-                        f.floor_name AS FloorName,
-                        w.warehouse_id_pkey AS WarehouseID,
-                        w.warehouse_name AS WarehouseName
-                FROM inventory_location il
-                JOIN warehouse_bin b ON il.warehouse_bin_id = b.warehouse_bin_id_pkey
-                JOIN warehouse_shelf s ON b.warehouse_shelf_id = s.warehouse_shelf_id_pkey
-                JOIN warehouse_aisle a ON s.warehouse_aisle_id = a.warehouse_aisle_id_pkey
-                JOIN warehouse_room r ON a.warehouse_room_id = r.warehouse_room_id_pkey
-                JOIN warehouse_floor f ON r.warehouse_floor_id = f.warehouse_floor_id_pkey
-                JOIN warehouse w ON f.warehouse_id = w.warehouse_id_pkey";
+        SELECT  il.inventory_location_id_pkey AS InventoryLocationID,
+                il.inventory_id AS InventoryID, 
+                il.warehouse_bin_id AS BinID,
+                b.bin_name AS BinName,
+                il.warehouse_shelf_id AS ShelfID,
+                s.shelf_name AS ShelfName,
+                il.warehouse_aisle_id AS AisleID,
+                a.aisle_name AS AisleName,
+                il.warehouse_room_id AS RoomID,
+                r.room_name AS RoomName,
+                il.warehouse_floor_id AS FloorID,
+                f.floor_name AS FloorName,
+                il.warehouse_id AS WarehouseID,
+                w.warehouse_name AS WarehouseName
+        FROM inventory_location il
+        JOIN warehouse_bin b ON il.warehouse_bin_id = b.warehouse_bin_id_pkey
+        JOIN warehouse_shelf s ON il.warehouse_shelf_id = s.warehouse_shelf_id_pkey
+        JOIN warehouse_aisle a ON il.warehouse_aisle_id = a.warehouse_aisle_id_pkey
+        JOIN warehouse_room r ON il.warehouse_room_id = r.warehouse_room_id_pkey
+        JOIN warehouse_floor f ON il.warehouse_floor_id = f.warehouse_floor_id_pkey
+        JOIN warehouse w ON il.warehouse_id = w.warehouse_id_pkey";
 
                 if (inventoryID != null)
                 {
@@ -103,7 +120,7 @@ namespace Inventory_Management_Backend.Repository
                     selectQuery += " WHERE il.inventory_location_id_pkey = @LocationID";
                 }
 
-                var parameters = new {InventoryID = inventoryID, LocationID = locationID};
+                var parameters = new { InventoryID = inventoryID, LocationID = locationID };
 
                 var inventoryLocation = await connection.QueryFirstOrDefaultAsync<InventoryLocationResponseDTO>(selectQuery, parameters);
 
@@ -116,7 +133,7 @@ namespace Inventory_Management_Backend.Repository
             }
         }
 
-        public async Task UpdateInventoryLocation(int inventoryID, InventoryLocationUpdateDTO updateDTO)
+        public async Task UpdateInventoryLocation(InventoryLocationRequestDTO requestDTO)
         {
             using (IDbConnection connection = _db.CreateConnection())
             {
@@ -124,10 +141,24 @@ namespace Inventory_Management_Backend.Repository
 
                 string updateQuery = @"
                         UPDATE inventory_location
-                        SET warehouse_bin_id = @BinID
-                        WHERE inventory_id = @Inventory;";
+                        SET warehouse_id = @WarehouseID,
+                            warehouse_floor_id = @FloorID,
+                            warehouse_room_id = @RoomID,
+                            warehouse_aisle_id = @AisleID,
+                            warehouse_shelf_id = @ShelfID,
+                            warehouse_bin_id = @BinID
+                        WHERE inventory_id = @InventoryID;";
 
-                var parameters = new { BinID = updateDTO.BinID, InventoryID = inventoryID};
+                var parameters = new
+                {
+                    WarehouseID = requestDTO.WarehouseID,
+                    FloorID = requestDTO.FloorID,
+                    RoomID = requestDTO.RoomID,
+                    AisleID = requestDTO.AisleID,
+                    ShelfID = requestDTO.ShelfID,
+                    BinID = requestDTO.BinID,
+                    InventoryID = requestDTO.InventoryID
+                };
 
                 await connection.ExecuteAsync(updateQuery, parameters);
             }

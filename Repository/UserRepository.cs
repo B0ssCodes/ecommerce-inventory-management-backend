@@ -25,7 +25,7 @@ namespace Inventory_Management_Backend.Repository
                 var query = @"
                     UPDATE user_info
                     SET deleted = true
-                    WHERE user_role_id_pkey = @UserID";
+                    WHERE user_id_pkey = @UserID";
 
                 await connection.ExecuteAsync(query, new { UserID = userID });
 
@@ -53,7 +53,7 @@ namespace Inventory_Management_Backend.Repository
             FROM user_info u
             INNER JOIN user_role r
             ON u.user_role_id = r.user_role_id_pkey
-            WHERE user_id_pkey = @UserID;";
+            WHERE user_id_pkey = @UserID AND u.deleted = false;";
 
                 var parameters = new { UserID = userID };
 
@@ -92,7 +92,8 @@ namespace Inventory_Management_Backend.Repository
             WHERE (@SearchQuery IS NULL OR 
                    u.user_first_name ILIKE '%' || @SearchQuery || '%' OR 
                    u.user_last_name ILIKE '%' || @SearchQuery || '%' OR 
-                   u.user_email ILIKE '%' || @SearchQuery || '%')";
+                   u.user_email ILIKE '%' || @SearchQuery || '%')
+            AND u.deleted = false";
 
                 // Add condition for CanPurchase permission if showCanPurchase is true
                 if (showCanPurchase)

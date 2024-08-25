@@ -10,7 +10,7 @@ using System.Net;
 namespace Inventory_Management_Backend.Controllers
 {
     [Route("api/transaction")]
-    [Authorize]
+    //[Authorize]
     [ApiController]
     public class TransactionController : ControllerBase
     {
@@ -24,7 +24,6 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPost]
-        [Authorize]
         [Route("get")]
         public async Task<IActionResult> GetTransactions(VendorTransactionDTO transactionDTO)
         {
@@ -52,7 +51,6 @@ namespace Inventory_Management_Backend.Controllers
 
       
         [HttpGet]
-        [Authorize]
         [Route("get/{transactionID}/{transactionTypeID}")]
         public async Task<IActionResult> GetTransaction(int transactionID, int transactionTypeID)
         {
@@ -87,8 +85,30 @@ namespace Inventory_Management_Backend.Controllers
             }
         }
 
+        [HttpGet]
+        [Route("getCount")]
+        public async Task<IActionResult> GetOutboundTransactionCount()
+        {
+            try
+            {
+                int transactionCount = await _transactionRepository.GetOutboundTransactionsCount();
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Message = "Transaction count fetched successfully";
+                _response.Result = transactionCount;
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                _response.Result = default;
+                return BadRequest(_response);
+            }
+        }
+
         [HttpPost]
-        [Authorize]
         [Route("create")]
         public async Task<IActionResult> CreateTransaction(TransactionCreateDTO createDTO)
         {
@@ -112,7 +132,6 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpPost]
-        [Authorize]
         [Route("submit")]
         public async Task<IActionResult> SubmitTransaction(TransactionSubmitDTO submitDTO)
         {
@@ -136,7 +155,6 @@ namespace Inventory_Management_Backend.Controllers
         }
 
         [HttpDelete]
-        [Authorize]
         [Route("delete/{transactionID}")]
         public async Task<IActionResult> DeleteTransaction(int transactionID)
         {
